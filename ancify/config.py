@@ -1,4 +1,4 @@
-"""Configuration loading and validation for the polarization pipeline."""
+"""Configuration loading and validation for ancify."""
 
 from dataclasses import dataclass, field
 from pathlib import Path

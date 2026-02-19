@@ -1,4 +1,4 @@
-"""I/O utilities and common helpers for the polarization pipeline."""
+"""I/O utilities and common helpers for ancify."""
 
 import gzip
 from pathlib import Path
