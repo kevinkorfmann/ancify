@@ -14,16 +14,24 @@ Fitch parsimony for tree-based ancestral inference.
 
 ## 1.1.0 (2026)
 
-GPU acceleration and vectorized compute backend.
+GPU acceleration and a vectorized compute backend for much faster Phase 1 and Phase 2 runs.
 
-- **GPU-accelerated ancestral calling.** Phase 2 now runs as ~15 tensor operations on the GPU instead of 248 million Python function calls per chromosome. On an NVIDIA A100, the full human genome completes in under 2 minutes.
-- **Vectorized coordinate projection.** Phase 1 replaces the per-character Python loop with NumPy vectorized scatter, yielding 20–50× speedup on CPU alone.
-- **Multi-GPU support.** Chromosomes are distributed round-robin across available NVIDIA GPUs. Configure with the new `backend` and `gpu_devices` config fields.
-- **Faster gzip decompression.** Optional `isal` dependency (Intel ISA-L) provides 2–5× faster gzip decompression for large AXT files. Install with `pip install 'ancify[fast]'`.
-- **New `ancify.backend` module.** Central abstraction for CPU/GPU execution with `detect_backend()`, `get_available_gpus()`, `open_gz()`, and vectorized implementations of majority vote, ancestral calling, and block scatter.
-- **New config fields:** `backend` (`"auto"` / `"cpu"` / `"gpu"`) and `gpu_devices` (list of GPU IDs).
-- **Bit-identical output.** All vectorized and GPU code paths produce identical results to the original scalar implementation. Tie-breaking, frequency thresholds, and confidence encoding are preserved exactly.
-- **New documentation page:** {doc}`performance` with full details on GPU setup, supported hardware, architecture, and tuning tips.
+### Performance
+
+- **GPU-accelerated ancestral calling (Phase 2).** Ancestral state inference runs as a small number of tensor operations on the GPU instead of per-position Python loops. On an NVIDIA A100, the full human genome completes in under 2 minutes (vs. hours on the original scalar path).
+- **Vectorized coordinate projection (Phase 1).** Net AXT projection uses NumPy vectorized scatter (CPU) or PyTorch scatter on CUDA. The per-character Python loop is removed, giving roughly 20–50× speedup on CPU.
+- **Multi-GPU support.** When using the GPU backend, chromosomes are distributed round-robin across available NVIDIA GPUs. Use the `gpu_devices` config field to restrict which devices are used.
+- **Faster gzip decompression.** Optional `isal` (Intel ISA-L) dependency provides 2–5× faster gzip decompression for large AXT files. Install with `pip install 'ancify[fast]'`.
+
+### New module and config
+
+- **`ancify.backend` module.** Central abstraction for CPU/GPU execution: `detect_backend()`, `get_available_gpus()`, `open_gz()`, and vectorized implementations of majority vote, ancestral calling, and block scatter for projection.
+- **New config fields:** `backend` (`"auto"` / `"cpu"` / `"gpu"`) and `gpu_devices` (optional list of GPU IDs, e.g. `[0, 1, 2]`). With `backend: auto`, ancify uses the GPU when PyTorch and CUDA are available, otherwise the vectorized CPU path.
+
+### Correctness and docs
+
+- **Bit-identical output.** Vectorized and GPU code paths produce the same results as the original scalar implementation. Tie-breaking, `min_inner_freq` / `min_outer_freq` behaviour, and case-encoded confidence are unchanged.
+- **New documentation page:** {doc}`performance` with GPU setup, supported hardware, architecture overview, and tuning tips.
 
 ## 1.0.0 (2025)
 
