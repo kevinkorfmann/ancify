@@ -46,6 +46,8 @@ Why ancify?
 - **Transparent** — confidence is encoded directly in the output (uppercase/lowercase). You always know how reliable each call is.
 - **Validated** — tested against the Ensembl EPO 13-primate ancestral reference with >99.9% agreement.
 
+**Manual (PDF):** A comprehensive LaTeX manual with algorithm descriptions, flowcharts, and worked examples is available as a single PDF: `manual.pdf on GitHub <https://github.com/kevinkorfmann/ancify/raw/main/docs/manual.pdf>`_.
+
 
 .. toctree::
    :maxdepth: 2

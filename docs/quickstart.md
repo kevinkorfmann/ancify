@@ -198,3 +198,4 @@ For a deeper understanding of the algorithm, see {doc}`algorithm`. For the biolo
 | Interpret evaluation results | {doc}`evaluation` |
 | Use ancify as a Python library | {doc}`api` |
 | Look up a term | {doc}`glossary` |
+| Download the full manual (PDF) | [manual.pdf on GitHub](https://github.com/kevinkorfmann/ancify/raw/main/docs/manual.pdf) |

@@ -302,13 +302,14 @@ The BCGM method (bonobo + chimp + gorilla + macaque) was validated against the E
 
 ## Documentation
 
-A comprehensive LaTeX manual with detailed algorithm descriptions, flowcharts, and worked examples is included in `docs/`. To compile:
+- **Online docs:** [ancify.readthedocs.io](https://ancify.readthedocs.io)
+- **Manual (PDF):** [docs/manual.pdf](https://github.com/kevinkorfmann/ancify/raw/main/docs/manual.pdf) — comprehensive LaTeX manual with algorithm descriptions, flowcharts, and worked examples.
+
+To rebuild the PDF from source:
 
 ```bash
 cd docs && pdflatex manual.tex && pdflatex manual.tex
 ```
-
-A pre-compiled PDF is included at `docs/manual.pdf`.
 
 ---
 
