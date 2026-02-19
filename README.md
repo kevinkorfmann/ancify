@@ -166,6 +166,20 @@ outgroups:
       alignment: dm6.droYak3.net.axt.gz
 ```
 
+### Brassica rapa (plant)
+
+```yaml
+focal_species: brassica_rapa
+chromosome_lengths: braRap1.chromLens.txt
+outgroups:
+  inner:
+    - name: brassica_oleracea
+      alignment: braRap1.braOleracea.net.axt.gz
+  outer:
+    - name: arabidopsis_thaliana
+      alignment: braRap1.araTha1.net.axt.gz
+```
+
 See `example_configs/` for complete examples.
 
 ---
@@ -302,7 +316,8 @@ ancify/
 ├── example_configs/
 │   ├── hg38_bcgm.yaml         # human (worked example)
 │   ├── mouse_example.yaml     # mouse (hypothetical)
-│   └── drosophila_example.yaml # fruit fly (hypothetical)
+│   ├── drosophila_example.yaml # fruit fly (hypothetical)
+│   └── brassica_rapa_example.yaml # Brassica rapa plant (hypothetical)
 ├── docs/
 │   ├── manual.tex              # comprehensive LaTeX manual
 │   └── manual.pdf              # pre-compiled PDF

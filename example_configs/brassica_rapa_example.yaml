@@ -1,0 +1,39 @@
+# ── Brassica rapa Ancestral Polarization ─────────────────────────
+# Hypothetical example for plant genome polarization.
+#
+# Inner outgroup : Brassica oleracea (close relative, same genus)
+# Outer outgroup : Arabidopsis thaliana (~20 Mya, same family Brassicaceae)
+#
+# You would need to obtain net AXT pairwise alignments (e.g. from
+# UCSC or other comparative genomics resources) and a chromosome-lengths
+# file for the focal assembly (e.g. from samtools faidx or assembly metadata).
+
+focal_species: brassica_rapa
+
+chromosome_lengths: braRap1.chromLens.txt
+
+# Omit 'chromosomes' to process all entries in the lengths file.
+# chromosomes:
+#   - A01
+#   - A02
+#   - A03
+
+outgroups:
+  inner:
+    - name: brassica_oleracea
+      alignment: braRap1.braOleracea.net.axt.gz
+  outer:
+    - name: arabidopsis_thaliana
+      alignment: braRap1.araTha1.net.axt.gz
+
+work_dir: .
+output_dir: ./brassica_rapa_ancestral
+
+min_inner_freq: 1
+min_outer_freq: 1
+num_cpus: 4
+
+# No evaluation data for this example.
+# evaluation:
+#   reference_dir: ...
+#   reference_pattern: ...
