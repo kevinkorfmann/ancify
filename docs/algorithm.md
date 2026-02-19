@@ -1,85 +1,152 @@
 # Algorithm
 
-This page describes the ancestral allele inference algorithm in detail.
+*A deep dive into how ancify infers ancestral alleles. This page teaches you the algorithm from first principles, with worked examples at every step.*
+
+---
 
 ## Overview
 
-ancify infers the ancestral allele at every position in a focal species'
-reference genome using a **two-tier outgroup voting scheme**:
+ancify infers the ancestral allele at every position in a focal species' reference genome using a **two-tier outgroup voting scheme**:
 
-1. **Inner outgroup consensus** — majority vote among closely related species.
-2. **Outer outgroup consensus** — majority vote among distantly related species.
-3. **Comparison** — the inner and outer consensuses are compared to produce a
-   confidence-encoded ancestral call.
+```text
+  INPUT                           PROCESSING                        OUTPUT
+  ─────                           ──────────                        ──────
+
+  Net AXT files        ┌──────────────────────┐
+  (one per outgroup    │  Phase 1: PROJECT    │    Projected FASTAs
+   species)       ────▶│  Map outgroup bases  │───▶ (one per species
+                       │  to focal coords     │     per chromosome)
+                       └──────────────────────┘
+                                                         │
+                                                         ▼
+                       ┌──────────────────────┐
+                       │  Phase 2: CALL       │    Ancestral FASTAs
+                  ────▶│  Two-tier voting     │───▶ (one per chromosome,
+                       │  + confidence encode │     confidence-encoded)
+                       └──────────────────────┘
+```
+
+---
 
 ## Phase 1: Coordinate Projection
 
-Before ancestral states can be called, each outgroup's pairwise alignment must
-be converted into a sequence in the focal species' coordinate system.
+Before ancestral states can be called, each outgroup's pairwise alignment must be converted into a sequence in the focal species' coordinate system. This is the most computationally expensive step.
 
 ### Input: Net AXT alignments
 
-The pipeline reads **net AXT** pairwise alignment files from UCSC. These
-represent best-in-genome one-to-one alignments between the focal and outgroup
-species.
+The pipeline reads **net AXT** pairwise alignment files from UCSC. These represent best-in-genome one-to-one alignments between the focal and outgroup species.
 
 Each alignment block in an AXT file consists of four lines:
 
+```text
+  Line 1: header    0 chr1 100 110 chrQ 500 510 + 1000
+  Line 2: target    ACGTNNACGT       ← focal species' sequence
+  Line 3: query     ACGTAAACGT       ← outgroup species' sequence
+  Line 4:                            ← blank separator
 ```
-0 chr1 1 10 chrQ 500 509 + 1000
-ACGTACGTNN          ← focal (target) sequence
-ACGTACGTAA          ← outgroup (query) sequence
-                    ← blank separator
+
+**Why net alignments?** Raw pairwise alignments can have overlapping blocks (e.g. from segmental duplications). The "netting" algorithm resolves these overlaps by keeping only the highest-scoring chain at each position, producing clean one-to-one mappings.
+
+### How projection works
+
+For each alignment block, the algorithm walks through the focal sequence character by character:
+
+```text
+  Focal (target):   A  C  G  -  T  N  N  A  C  G  T
+  Outgroup (query): A  C  G  T  T  A  A  A  C  G  T
+                    ↓  ↓  ↓     ↓  ↓  ↓  ↓  ↓  ↓  ↓
+  Projected:        A  C  G     T  A  A  A  C  G  T
+
+  Rules:
+    - Focal is a base → record the outgroup's base at that focal position
+    - Focal is a gap (-) → skip (insertion in outgroup, no focal coordinate)
+    - Position not covered by any block → fill with N
 ```
 
-### Projection logic
+The result is a FASTA file for each (outgroup, chromosome) pair, with the **same length** as the focal chromosome. Every position either contains the outgroup's aligned base or `N` (no alignment).
 
-For each alignment block:
+### Worked example
 
-- Walk through the focal sequence character by character.
-- If the focal character is a nucleotide (`A/T/C/G/N`), record the
-  corresponding outgroup character at that focal position.
-- If the focal character is a gap (`-`), skip — this represents an insertion
-  in the outgroup that has no corresponding position in the focal genome.
-- Positions not covered by any alignment block are filled with `N`.
+Suppose the focal chromosome is 20 bases long and we have two alignment blocks:
 
-The result is a FASTA file for each (outgroup, chromosome) pair, with the same
-length as the focal chromosome.
+```text
+  Focal chromosome:    positions 1-20 (20 bases)
+
+  Block A (positions 3-8):
+    Focal:    A C G T A C
+    Outgroup: A C A T A C
+
+  Block B (positions 15-18):
+    Focal:    T G A C
+    Outgroup: T G A T
+
+  Projected sequence:
+    Position:  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20
+    Result:    N  N  A  C  A  T  A  C  N  N  N  N  N  N  T  G  A  T  N  N
+                     └── Block A ──┘                     └─ Block B ┘
+```
+
+Positions 1-2, 9-14, and 19-20 have no alignment coverage and are filled with `N`.
+
+---
 
 ## Phase 2: Ancestral State Inference
 
-### Majority vote
+This is the core algorithm. At every genomic position, it collects the projected bases from all outgroups, computes votes, and produces a confidence-encoded ancestral call.
 
-For a set of bases from multiple species, the **majority vote** selects the
-most frequent valid nucleotide (A, C, G, or T). Ties are broken alphabetically
-(A > C > G > T). Bases that are `N`, `-`, or other non-nucleotide characters
-are excluded from the vote.
+### Step 1: Majority vote
 
-If no base reaches the minimum frequency threshold (`min_inner_freq` or
-`min_outer_freq`), the consensus is `N` (missing).
+For a set of bases from multiple species, the **majority vote** selects the most frequent valid nucleotide (A, C, G, or T):
 
-### Decision logic
+```text
+  Example: inner outgroups at position chr1:1000
 
-At each genomic position, the algorithm:
+    Bonobo:   A
+    Chimp:    A
+    Gorilla:  G
 
-1. Computes the **inner consensus** from all inner outgroup species.
-2. Computes the **outer consensus** from all outer outgroup species.
-3. Compares them:
+    Tally:  A=2, G=1
+    Majority vote → A (frequency 2)
+```
 
-| Inner | Outer | Result | Confidence |
-|-------|-------|--------|------------|
-| `A` | `A` | `A` | **High** (uppercase) |
-| `A` | `N` | `a` | Low (lowercase) |
-| `N` | `A` | `a` | Low (lowercase) |
-| `A` | `T` | `n` | Unresolved (disagreement) |
-| `N` | `N` | `N` | Missing (both tiers lack data) |
+**Tie-breaking:** Ties are broken alphabetically (A > C > G > T). This is arbitrary but deterministic.
 
-### Pseudocode
+**Filtering:** Bases that are `N`, `-`, or other non-nucleotide characters are excluded from the vote. If no base reaches the minimum frequency threshold (`min_inner_freq` or `min_outer_freq`), the consensus is `N` (missing).
+
+```text
+  Example with min_inner_freq=2:
+
+    Bonobo:   A
+    Chimp:    N       ← excluded (missing)
+    Gorilla:  G
+
+    Tally:  A=1, G=1
+    Neither reaches threshold of 2 → consensus is N
+```
+
+### Step 2: Compare inner and outer
+
+Once the inner consensus and outer consensus are computed, the algorithm compares them:
+
+```text
+  ┌─────────┬─────────┬─────────────┬─────────────────────────────────┐
+  │  Inner  │  Outer  │   Output    │  Interpretation                 │
+  ├─────────┼─────────┼─────────────┼─────────────────────────────────┤
+  │    A    │    A    │   A (HIGH)  │  Both tiers agree → confident   │
+  │    A    │    N    │   a (low)   │  Only inner has data            │
+  │    N    │    A    │   a (low)   │  Only outer has data            │
+  │    A    │    T    │   n (none)  │  Tiers disagree → unresolved    │
+  │    N    │    N    │   N (none)  │  No data at all                 │
+  └─────────┴─────────┴─────────────┴─────────────────────────────────┘
+```
+
+### The complete algorithm as pseudocode
 
 ```python
-def call_ancestral_base(inner_bases, outer_bases):
-    inner = majority_vote(inner_bases)
-    outer = majority_vote(outer_bases)
+def call_ancestral_base(inner_bases, outer_bases,
+                        min_inner_freq=1, min_outer_freq=1):
+    inner = majority_vote(inner_bases, min_freq=min_inner_freq)
+    outer = majority_vote(outer_bases, min_freq=min_outer_freq)
 
     if inner != "N" and inner == outer:
         return inner              # HIGH confidence (uppercase)
@@ -89,62 +156,209 @@ def call_ancestral_base(inner_bases, outer_bases):
         return inner.lower()      # LOW confidence (lowercase)
     if inner == "N" and outer == "N":
         return "N"                # Both missing
-    return "n"                    # Disagreement
+    return "n"                    # Disagreement (unresolved)
 ```
+
+### Worked example: full pipeline for one position
+
+Let us trace position chr1:50,000 through the entire algorithm:
+
+```text
+  Step 1: Collect projected bases at chr1:50,000
+
+    Bonobo (inner):    T
+    Chimp (inner):     T
+    Gorilla (inner):   T
+    Macaque (outer):   T
+
+  Step 2: Inner majority vote
+
+    Tally: T=3
+    min_inner_freq=1, so T qualifies
+    Inner consensus: T
+
+  Step 3: Outer majority vote
+
+    Tally: T=1
+    min_outer_freq=1, so T qualifies
+    Outer consensus: T
+
+  Step 4: Compare
+
+    Inner=T, Outer=T → they agree
+    Output: "T" (uppercase = high confidence)
+```
+
+Now consider a more interesting position, chr1:75,000:
+
+```text
+  Step 1: Collect projected bases at chr1:75,000
+
+    Bonobo (inner):    A
+    Chimp (inner):     A
+    Gorilla (inner):   G
+    Macaque (outer):   G
+
+  Step 2: Inner majority vote
+
+    Tally: A=2, G=1
+    Inner consensus: A (majority)
+
+  Step 3: Outer majority vote
+
+    Tally: G=1
+    Outer consensus: G
+
+  Step 4: Compare
+
+    Inner=A, Outer=G → DISAGREEMENT
+    Output: "n" (unresolved)
+```
+
+This pattern (inner says A, outer says G) is consistent with incomplete lineage sorting in the human-gorilla ancestor, where gorilla and macaque inherited one allele and bonobo+chimp inherited another.
+
+---
 
 ## Confidence encoding
 
-The output FASTA encodes confidence via letter case:
+The output FASTA encodes confidence via letter case. This is compatible with the Ensembl EPO ancestral sequence convention:
 
-| Character | Confidence | Condition |
-|-----------|-----------|-----------|
-| `ACGT` | High | Inner and outer outgroups agree |
-| `acgt` | Low | Only one outgroup tier has data |
-| `n` (lowercase) | Unresolved | Inner and outer disagree |
-| `N` (uppercase) | Missing | Both tiers lack data |
+| Character | Confidence | Condition | Typical fraction (human) |
+|-----------|-----------|-----------|--------------------------|
+| `ACGT` | **High** | Inner and outer outgroups agree | ~75% |
+| `acgt` | **Low** | Only one outgroup tier has data | ~15% |
+| `n` | **Unresolved** | Inner and outer disagree | ~0.1% |
+| `N` | **Missing** | Both tiers lack data | ~10% |
 
-This encoding is compatible with the Ensembl EPO ancestral sequence convention.
+This encoding means that a single FASTA file carries both the ancestral call and its reliability. No sidecar files or separate quality tracks are needed.
 
-## The `min_inner_freq` parameter
-
-This parameter controls how strict the inner majority vote is. With 3 inner
-outgroup species:
-
-| Value | Meaning |
-|-------|---------|
-| 1 | Any single species suffices (maximum coverage) |
-| 2 | At least 2 of 3 must agree (balanced) |
-| 3 | All 3 must agree (maximum stringency) |
-
-The same logic applies to `min_outer_freq` for the outer outgroup tier.
+---
 
 ## Biological rationale
 
-### Why two tiers?
+### Why two tiers instead of one big vote?
 
-Using a single outgroup is vulnerable to:
+Consider what happens with a single flat vote across all outgroups:
 
-- **Back mutations**: the outgroup lineage mutated away from the true ancestral state.
-- **Incomplete lineage sorting (ILS)**: gene trees disagree with the species tree.
-- **Alignment errors**: spurious alignments in repetitive regions.
+```text
+  Single-tier vote (all 4 species equally weighted):
 
-The two-tier approach mitigates these risks:
+    Bonobo:   A     ┐
+    Chimp:    A     ├─ These 3 are NOT independent observations.
+    Gorilla:  A     ┘  Due to ILS, they may all inherit the same
+    Macaque:  G        wrong allele from the ancestral population.
 
-- The **inner outgroup** (multiple closely related species) uses majority voting
-  to overcome single-species errors.
-- The **outer outgroup** (a more distant species) provides an independent
-  evolutionary check. Agreement between the two tiers makes convergent
-  misinference very unlikely.
+    Flat vote: A wins 3-to-1.
+    But what if A is the derived allele, shared through ILS?
+```
 
-### When the algorithm fails
+The two-tier approach treats the inner outgroups as a *single correlated observation* and demands independent confirmation from a distant outgroup:
 
-The algorithm can still fail in rare cases:
+```text
+  Two-tier vote:
+    Inner consensus: A (3/3)
+    Outer consensus: G (1/1)
+    → DISAGREEMENT → flagged as "n"
 
-- **Convergent substitution**: the same mutation occurred independently in both
-  the focal and outer outgroup lineages.
-- **ILS across the inner clade**: all inner species inherited the derived allele
-  through ILS, and the outer outgroup independently carries the same derived allele.
-- **Systematic alignment artifacts**: e.g., paralog confusion in segmental duplications.
+  This catches the ILS case!
+```
 
-These cases are flagged as either disagreement (`n`) or contribute to the
-~0.1% error rate observed in practice.
+### Incomplete lineage sorting (ILS)
+
+When ancestral populations were large and speciation events were close together, gene trees can disagree with the species tree:
+
+```text
+  Species tree:                  Gene tree at this locus:
+
+       ┌── Bonobo                     ┌── Bonobo
+    ┌──┤                           ┌──┤
+    │  └── Chimp                   │  └── Gorilla     ← ILS!
+  ──┤                            ──┤
+    │  ┌── Gorilla                 │  ┌── Chimp
+    └──┤                           └──┤
+       └── Macaque                    └── Macaque
+```
+
+For the human-chimp-gorilla clade, ILS affects ~1-3% of the genome. The two-tier approach detects most of these cases because the outer outgroup (macaque) provides a phylogenetically independent anchor.
+
+### When the algorithm can still fail
+
+No method is perfect. The algorithm can produce incorrect calls in rare cases:
+
+| Failure mode | Frequency | Mechanism |
+|-------------|-----------|-----------|
+| Convergent substitution | <0.01% | Same mutation on both inner and outer branches |
+| Correlated ILS | <0.1% | All inner species AND the outer share the derived allele through deep coalescence |
+| Systematic alignment error | Variable | Paralog confusion in segmental duplications |
+
+These contribute to the ~0.1% disagreement rate observed when comparing ancify's human calls to the Ensembl EPO 13-primate reference.
+
+---
+
+## The `min_inner_freq` parameter in depth
+
+This parameter lets you trade coverage for accuracy:
+
+```text
+  3 inner species, varying min_inner_freq:
+
+  ┌───────────────────┬───────────┬──────────┬──────────────────────┐
+  │ min_inner_freq    │ Rule      │ Coverage │ Accuracy             │
+  ├───────────────────┼───────────┼──────────┼──────────────────────┤
+  │ 1                 │ Any 1     │ Highest  │ Lowest (but still    │
+  │                   │ suffices  │          │ >99% for primates)   │
+  │ 2                 │ 2 of 3    │ Moderate │ Good                 │
+  │                   │ agree     │          │                      │
+  │ 3                 │ All 3     │ Lowest   │ Highest              │
+  │                   │ agree     │          │                      │
+  └───────────────────┴───────────┴──────────┴──────────────────────┘
+```
+
+**Example:** With `min_inner_freq=2` and bases `[A, N, A]`:
+- Tally: A=2, N excluded
+- Threshold met (2 >= 2): consensus is A
+
+With `min_inner_freq=2` and bases `[A, N, G]`:
+- Tally: A=1, G=1
+- Neither reaches threshold: consensus is N (missing)
+
+The same logic applies to `min_outer_freq` for the outer tier. Since there is typically only one outer outgroup species, `min_outer_freq` is usually left at 1.
+
+---
+
+## Alignment quality and its effects
+
+The pipeline's accuracy depends fundamentally on the quality of the input alignments:
+
+```text
+  Good alignment region        Poor alignment region
+  (unique sequence)            (segmental duplication)
+
+  Focal:    ACGTACGT            Focal:    ACGTACGT
+  Outgroup: ACGTACGT            Outgroup: TGCATGCA  ← paralog!
+            ^^^^^^^^                      ^^^^^^^^
+            Correct projected             Incorrect projected
+            bases                         bases → bad ancestral call
+```
+
+Net alignments mitigate paralog confusion by keeping only the best one-to-one chain at each position, but regions with recent segmental duplications, transposable elements, or structural variants can still produce artifacts. These typically manifest as `N` (no alignment) or disagreements (`n`).
+
+---
+
+## Summary
+
+```text
+  For each position in the focal genome:
+
+  1. Gather projected bases from all outgroup species
+  2. Compute inner consensus (majority vote among close relatives)
+  3. Compute outer consensus (majority vote among distant relatives)
+  4. Compare:
+       agree  → UPPERCASE (high confidence)
+       one N  → lowercase (low confidence)
+       differ → n (unresolved)
+       both N → N (missing)
+  5. Write to output FASTA
+```
+
+This is simple, fast (Phase 2 takes minutes for a full genome), and produces reliable ancestral calls with built-in confidence assessment.

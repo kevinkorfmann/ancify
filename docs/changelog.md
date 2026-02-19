@@ -13,5 +13,6 @@ Initial release.
 - CLI with subcommands: `init`, `project`, `call`, `evaluate`, `run`.
 - Python API for programmatic use.
 - 108 unit and integration tests.
-- Example configs for human, mouse, and Drosophila.
+- Example configs for human, mouse, Drosophila, and Brassica rapa.
+- Comprehensive documentation with population genetics background, tutorials, and algorithm deep dives.
 - Installable with pip or uv.

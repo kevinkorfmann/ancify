@@ -24,13 +24,26 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-html_title = "ancify"
+html_title = "ancify — Ancestral Allele Polarization"
 
 html_theme_options = {
-    "navigation_depth": 3,
+    "navigation_depth": 4,
     "collapse_navigation": False,
     "sticky_navigation": True,
     "logo_only": False,
+    "prev_next_buttons_location": "both",
+    "style_external_links": True,
+    "style_nav_header_background": "#2c3e50",
+    "titles_only": False,
+    "display_version": True,
+}
+
+html_context = {
+    "display_github": True,
+    "github_user": "kevinkorfmann",
+    "github_repo": "ancify",
+    "github_version": "main",
+    "conf_py_path": "/docs/",
 }
 
 autodoc_member_order = "bysource"
@@ -52,4 +65,9 @@ source_suffix = {
 myst_enable_extensions = [
     "colon_fence",
     "deflist",
+    "fieldlist",
+    "substitution",
+    "tasklist",
 ]
+
+myst_heading_anchors = 3

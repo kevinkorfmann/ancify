@@ -2,7 +2,11 @@
 
 **Infer ancestral alleles for any species using outgroup alignments.**
 
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://ancify.readthedocs.io)
+
 ancify is a config-driven Python pipeline that determines the ancestral state at every position in a reference genome by comparing pairwise alignments from multiple outgroup species. It uses a two-tier inner/outer outgroup voting scheme with case-encoded confidence levels.
+
+**Full documentation:** [ancify.readthedocs.io](https://ancify.readthedocs.io) — includes a population genetics background primer, step-by-step tutorials, algorithm deep dives, and a species adaptation guide.
 
 ---
 
