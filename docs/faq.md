@@ -26,13 +26,13 @@ Accuracy depends on the divergence times and alignment quality for your specific
 
 ### How long does it take?
 
-| Phase | Human genome (24 cores) | Single chromosome |
-|-------|------------------------|-------------------|
-| Phase 1 (projection) | 2-8 hours | 10-30 minutes |
-| Phase 2 (calling) | 5-15 minutes | <1 minute |
-| Phase 3 (evaluation) | 5-15 minutes | <1 minute |
+| Phase | CPU (scalar) | CPU (vectorized) | GPU (NVIDIA A100) |
+|-------|-------------|-----------------|-------------------|
+| Phase 1 (projection) | 2-8 hours | ~5 minutes | ~2 minutes |
+| Phase 2 (calling) | 5-15 minutes | ~10 minutes | ~10 seconds |
+| Phase 3 (evaluation) | 5-15 minutes | 5-15 minutes | 5-15 minutes |
 
-Phase 1 is the bottleneck — it streams through large compressed alignment files. Phases 2 and 3 are fast.
+With the GPU backend enabled, the full human genome completes in ~2 minutes. Even without a GPU, the vectorized NumPy backend is much faster than the original scalar path. See {doc}`performance` for details.
 
 ### How much memory do I need?
 
@@ -122,9 +122,35 @@ Each chromosome loads all projected sequences simultaneously. Solutions:
 
 Phase 1 streams through large compressed files. This is I/O-bound, not CPU-bound:
 
+- **Install `isal`** — `pip install 'ancify[fast]'` provides 2–5× faster gzip decompression using Intel ISA-L
+- **Enable the vectorized backend** — set `backend: auto` or `backend: cpu` in your config. The vectorized NumPy scatter is 20–50× faster than the original character loop
 - Use an **SSD** for the alignment files
 - Consider splitting by species: run projection for each outgroup on a separate machine/job, since AXT files are independent
 - Phase 1 only needs to be run once; subsequent Phase 2 runs reuse the projected files
+
+### Do I need a GPU?
+
+No. The vectorized NumPy backend (selected automatically when PyTorch is not installed, or with `backend: cpu`) is already much faster than the original scalar path. GPU acceleration is an additional speedup on top of that, primarily beneficial for large genomes (> 1 Gb). See {doc}`performance` for benchmarks.
+
+### How do I enable GPU acceleration?
+
+1. Install PyTorch with CUDA support: `pip install torch --index-url https://download.pytorch.org/whl/cu128`
+2. Set `backend: auto` (or `backend: gpu`) in your config
+3. Optionally set `gpu_devices: [0, 1, 2]` to specify which GPUs to use
+
+ancify will detect PyTorch + CUDA automatically and use the GPU backend. Check with `ancify run -c config.yaml -v` — the first log line reports the active backend.
+
+### My GPU runs out of memory
+
+Each chromosome needs roughly 6 GB of GPU memory for 4 outgroups and a 248M-position chromosome. Solutions:
+
+1. **Process fewer chromosomes in parallel** — reduce `num_cpus`
+2. **Restrict to fewer GPUs** — set `gpu_devices` to a list with fewer entries so memory is not split across too many concurrent tasks
+3. **Fall back to CPU** — set `backend: cpu` for the vectorized NumPy path, which uses system RAM instead
+
+### Does the GPU backend change the output?
+
+No. All three backends (scalar, vectorized CPU, GPU) produce **bit-identical** output. The tie-breaking rule, frequency thresholds, and confidence encoding are preserved exactly. You can verify this by running the same config with different `backend` settings and comparing the output FASTAs.
 
 ### Can I resume a failed run?
 

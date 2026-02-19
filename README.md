@@ -4,7 +4,7 @@
 
 [![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://ancify.readthedocs.io)
 
-ancify is a config-driven Python pipeline that determines the ancestral state at every position in a reference genome by comparing pairwise alignments from multiple outgroup species. It uses a two-tier inner/outer outgroup voting scheme with case-encoded confidence levels.
+ancify is a config-driven Python pipeline that determines the ancestral state at every position in a reference genome by comparing pairwise alignments from multiple outgroup species. It supports two inference methods: a **two-tier inner/outer outgroup voting** scheme and **Fitch parsimony** on a phylogenetic tree, both with case-encoded confidence levels.
 
 **Full documentation:** [ancify.readthedocs.io](https://ancify.readthedocs.io) — includes a population genetics background primer, step-by-step tutorials, algorithm deep dives, and a species adaptation guide.
 
@@ -51,12 +51,22 @@ Net AXT alignments          Projected sequences         Ancestral FASTA
 
 ### Confidence Encoding
 
+**Voting method** (default):
+
 | Character | Confidence | Meaning |
 |-----------|-----------|---------|
 | `ACGT` | High | Inner and outer outgroups agree |
 | `acgt` | Low | Only one tier has data |
 | `n` | Unresolved | Inner and outer disagree |
 | `N` | Missing | No data from either tier |
+
+**Parsimony method**:
+
+| Character | Confidence | Meaning |
+|-----------|-----------|---------|
+| `ACGT` | High | Unique most-parsimonious root state |
+| `acgt` | Low | Ambiguous root (multiple equally parsimonious states) |
+| `N` | Missing | All outgroup leaves lack data |
 
 ---
 
@@ -116,6 +126,8 @@ num_cpus: 24
 | `outgroups.outer` | Distantly related species (independent check) |
 | `min_inner_freq` | Min count for inner majority vote (default: 1) |
 | `min_outer_freq` | Min count for outer majority vote (default: 1) |
+| `method` | `"voting"` (default) or `"parsimony"` |
+| `tree` | Newick tree string or path to `.nwk` file (required for parsimony) |
 | `num_cpus` | Parallel workers (default: 4) |
 | `evaluation` | Optional block for Phase 3 (reference + VCF comparison) |
 
@@ -190,7 +202,7 @@ See `example_configs/` for complete examples.
 
 ## How It Works
 
-### The Algorithm
+### Method 1: Two-tier voting (default)
 
 1. **Inner consensus**: majority vote among closely related outgroup species (e.g. bonobo, chimp, gorilla).
 2. **Outer consensus**: majority vote among distantly related outgroup species (e.g. macaque).
@@ -201,6 +213,17 @@ See `example_configs/` for complete examples.
    - Both missing &rarr; **missing** (`N`)
 
 This two-tier approach guards against incomplete lineage sorting and lineage-specific substitutions. The outer outgroup provides an independent evolutionary check on the inner consensus.
+
+### Method 2: Fitch parsimony
+
+Instead of splitting outgroups into two tiers, you provide a **Newick phylogenetic tree** and ancify uses the **Fitch (1971) algorithm** to reconstruct the most parsimonious ancestral state at the root:
+
+```yaml
+method: parsimony
+tree: "(((bonobo,chimp),gorilla),macaque)"
+```
+
+The tree topology determines how species are weighted, resolving cases that the voting method marks as unresolved. See the [algorithm docs](https://ancify.readthedocs.io/en/latest/algorithm.html) for a detailed walkthrough.
 
 ### Input: Net AXT Alignments
 
@@ -263,12 +286,22 @@ cfg = load_config("config.yaml")
 run_projection(cfg)
 run_ancestral_calling(cfg)
 
-# Or call the core function directly
+# Or call the core function directly (voting)
 base = call_ancestral_base(
     inner_bases=["A", "A", "G"],
     outer_bases=["A"],
 )
 # Returns "A" (high confidence)
+
+# Or use Fitch parsimony directly
+from ancify.ancestral import call_ancestral_base_parsimony
+from ancify.parsimony import parse_newick
+
+tree = parse_newick("(((bonobo,chimp),gorilla),macaque)")
+base = call_ancestral_base_parsimony(tree, {
+    "bonobo": "G", "chimp": "G", "gorilla": "A", "macaque": "A"
+})
+# Returns "A" (high confidence -- tree resolves the ambiguity)
 ```
 
 ---
@@ -334,6 +367,7 @@ ancify/
     ├── utils.py                # FASTA I/O, majority vote
     ├── project.py              # Phase 1: coordinate projection
     ├── ancestral.py            # Phase 2: ancestral calling
+    ├── parsimony.py            # Fitch algorithm & Newick parser
     └── evaluate.py             # Phase 3: evaluation
 ```
 

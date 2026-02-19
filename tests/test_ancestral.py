@@ -2,7 +2,8 @@
 
 import pytest
 
-from ancify.ancestral import call_ancestral_base
+from ancify.ancestral import call_ancestral_base, call_ancestral_base_parsimony
+from ancify.parsimony import parse_newick
 
 
 class TestCallAncestralBase:
@@ -117,6 +118,72 @@ class TestCallAncestralBase:
     def test_lowercase_input_handled(self):
         result = call_ancestral_base(["a", "a", "a"], ["a"])
         assert result == "A"
+
+
+class TestCallAncestralBaseParsimony:
+    """Test the parsimony-based ancestral calling function."""
+
+    TREE = parse_newick("(((bonobo,chimp),gorilla),macaque);")
+
+    def test_all_agree_uppercase(self):
+        bases = {"bonobo": "A", "chimp": "A", "gorilla": "A", "macaque": "A"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result == "A"
+        assert result.isupper()
+
+    def test_ambiguous_lowercase(self):
+        bases = {"bonobo": "A", "chimp": "A", "gorilla": "A", "macaque": "G"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result.islower()
+        assert result.upper() in "ACGT"
+
+    def test_all_missing_returns_N(self):
+        bases = {"bonobo": "N", "chimp": "N", "gorilla": "N", "macaque": "N"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result == "N"
+
+    def test_some_missing_still_resolves(self):
+        bases = {"bonobo": "T", "chimp": "T", "gorilla": "N", "macaque": "T"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result == "T"
+
+    def test_simple_two_taxa(self):
+        tree = parse_newick("(X,Y);")
+        bases = {"X": "C", "Y": "C"}
+        result = call_ancestral_base_parsimony(tree, bases)
+        assert result == "C"
+
+    def test_two_taxa_disagree_lowercase(self):
+        tree = parse_newick("(X,Y);")
+        bases = {"X": "A", "Y": "T"}
+        result = call_ancestral_base_parsimony(tree, bases)
+        assert result.islower()
+        assert result.upper() in "ACGT"
+
+    def test_returns_single_char(self):
+        bases = {"bonobo": "G", "chimp": "G", "gorilla": "G", "macaque": "G"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert len(result) == 1
+
+    def test_result_is_valid_or_N(self):
+        cases = [
+            {"bonobo": "A", "chimp": "A", "gorilla": "A", "macaque": "A"},
+            {"bonobo": "N", "chimp": "N", "gorilla": "N", "macaque": "N"},
+            {"bonobo": "A", "chimp": "G", "gorilla": "T", "macaque": "C"},
+        ]
+        for bases in cases:
+            result = call_ancestral_base_parsimony(self.TREE, bases)
+            assert result.upper() in ("A", "C", "G", "T", "N")
+
+    def test_missing_species_treated_as_N(self):
+        bases = {"bonobo": "A", "chimp": "A"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result.upper() in "ACGT"
+
+    def test_lowercase_input_handled(self):
+        bases = {"bonobo": "c", "chimp": "c", "gorilla": "c", "macaque": "c"}
+        result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result == "C"
 
 
 class TestCallAncestralBaseReturnTypes:

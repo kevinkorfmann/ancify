@@ -46,6 +46,13 @@ min_outer_freq: 1
 
 num_cpus: 24
 
+# Performance backend: "auto", "cpu", or "gpu".
+# "auto" uses GPU when PyTorch + CUDA is available, otherwise CPU.
+backend: auto
+
+# Optional: restrict to specific GPUs (default: use all).
+gpu_devices: [0, 1, 2]
+
 # Optional evaluation block (Phase 3).
 evaluation:
   reference_dir: ./ensembl_ancestor/
@@ -84,6 +91,10 @@ Each outgroup entry requires:
 | `min_inner_freq` | `1` | Minimum allele count for inner majority vote |
 | `min_outer_freq` | `1` | Minimum allele count for outer majority vote |
 | `num_cpus` | `4` | Number of parallel worker processes |
+| `backend` | `auto` | Compute backend: `"auto"`, `"cpu"`, or `"gpu"` (see {doc}`performance`) |
+| `gpu_devices` | all available | List of GPU device IDs to use, e.g. `[0, 1, 2]` |
+| `method` | `voting` | Ancestral inference method: `"voting"` or `"parsimony"` (see {doc}`algorithm`) |
+| `tree` | none | Newick tree of outgroup species (required when `method: parsimony`). Inline string or path to `.nwk` file. |
 | `evaluation` | none | Optional evaluation block (see below) |
 
 ### Evaluation fields
@@ -131,6 +142,28 @@ Each chromosome is processed independently. `num_cpus` controls how many chromos
 ```
 
 If you are running on a machine with limited memory, reduce `num_cpus`. For Phase 1 (projection), memory is modest; the bottleneck is Phase 2 (calling), which loads all projected sequences for each active chromosome.
+
+### `backend`: the compute engine
+
+This field selects which execution backend ancify uses for the heavy computation
+in Phases 1 and 2. See {doc}`performance` for the full details.
+
+```text
+  backend: "auto"             backend: "cpu"             backend: "gpu"
+  ──────────────────          ──────────────             ──────────────
+  Uses GPU if PyTorch         Forces CPU-only            Forces GPU mode
+  + CUDA is detected,         (vectorized NumPy).        (requires PyTorch
+  else falls back to          Still much faster than     + CUDA).
+  vectorized CPU.             the unvectorized path.
+```
+
+When `backend: "gpu"` is active, you can further restrict which GPUs are used
+with `gpu_devices`:
+
+```yaml
+backend: gpu
+gpu_devices: [0, 2]    # use only GPU 0 and GPU 2
+```
 
 ### Choosing chromosomes
 
@@ -259,11 +292,44 @@ output_dir: /results/human_ancestral
 min_inner_freq: 2
 min_outer_freq: 1
 num_cpus: 32
+backend: auto
+gpu_devices: [0, 1, 2]
 evaluation:
   reference_dir: /data/ensembl_ancestor/
   reference_pattern: "homo_sapiens_ancestor_{chrom_id}.fa"
   vcf_dir: /data/1kg/
   vcf_pattern: "ALL.chr{chrom_id}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz"
+```
+
+### Fitch parsimony
+
+The same outgroup configuration with the phylogenetic tree-based method:
+
+```yaml
+focal_species: human
+chromosome_lengths: chromoLens.txt
+outgroups:
+  inner:
+    - name: bonobo
+      alignment: hg38.panPan3.net.axt.gz
+    - name: chimp
+      alignment: hg38.panTro6.net.axt.gz
+    - name: gorilla
+      alignment: hg38.gorGor6.net.axt.gz
+  outer:
+    - name: macaque
+      alignment: hg38.rheMac10.net.axt.gz
+method: parsimony
+tree: "(((bonobo,chimp),gorilla),macaque)"
+output_dir: ./human_ancestral_parsimony
+```
+
+Leaf names in the Newick tree must match the `name` fields of your outgroup entries. When `method` is `parsimony`, the inner/outer distinction is ignored — all outgroups are placed on the tree and the Fitch algorithm determines their relative weights.
+
+You can also point `tree` to an external file:
+
+```yaml
+tree: species_tree.nwk
 ```
 
 ### Quick test run (single chromosome)

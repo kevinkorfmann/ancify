@@ -58,6 +58,14 @@ ancify.ancestral
    :undoc-members:
 
 
+ancify.parsimony
+----------------
+
+.. automodule:: ancify.parsimony
+   :members:
+   :undoc-members:
+
+
 ancify.evaluate
 ---------------
 

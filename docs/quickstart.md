@@ -80,14 +80,18 @@ ancify run -c config.yaml
 
 This runs all three phases in sequence:
 
-| Phase | What it does | Time (human genome, 24 cores) |
-|-------|-------------|-------------------------------|
-| **1. Project** | Converts outgroup alignments into focal-species coordinates | 2-8 hours |
-| **2. Call** | Infers the ancestral allele at every position | 5-15 minutes |
-| **3. Evaluate** | Compares calls against a reference (optional) | 5-15 minutes |
+| Phase | What it does | Time (CPU) | Time (GPU) |
+|-------|-------------|------------|------------|
+| **1. Project** | Converts outgroup alignments into focal-species coordinates | 2-8 hours | ~2 minutes |
+| **2. Call** | Infers the ancestral allele at every position | 5-15 minutes | ~10 seconds |
+| **3. Evaluate** | Compares calls against a reference (optional) | 5-15 minutes | 5-15 minutes |
 
 :::{note}
 Phase 1 is the slow step because it streams through large alignment files. Phases 2 and 3 are fast. If Phase 1 has already been run, you can re-run just Phase 2 with `ancify call -c config.yaml`.
+:::
+
+:::{tip}
+For dramatically faster runs, install PyTorch with CUDA support and add `backend: auto` to your config. See {doc}`performance` for setup instructions and benchmarks.
 :::
 
 ## Step 5: Understand the output
@@ -190,6 +194,7 @@ For a deeper understanding of the algorithm, see {doc}`algorithm`. For the biolo
 
 | I want to... | Go to... |
 |--------------|----------|
+| Speed up runs with GPU acceleration | {doc}`performance` |
 | Understand the biology behind polarization | {doc}`background` |
 | Walk through a complete worked example | {doc}`tutorials` |
 | Configure ancify for a different species | {doc}`species_guide` |

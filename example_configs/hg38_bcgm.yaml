@@ -50,6 +50,11 @@ min_inner_freq: 1
 min_outer_freq: 1
 num_cpus: 24
 
+# ── Ancestral inference method ────────────────────────────────────
+# Uncomment to use Fitch parsimony instead of two-tier voting.
+# method: parsimony
+# tree: "(((bonobo,chimp),gorilla),macaque)"
+
 evaluation:
   reference_dir: /sietch_colab/data_share/hg38_anc/embi_homo_sapiens_ancestor_GRCh38
   reference_pattern: "homo_sapiens_ancestor_{chrom_id}.fa"

@@ -65,6 +65,17 @@ EXAMPLE_CONFIG = textwrap.dedent("""\
     # Number of parallel worker processes.
     num_cpus: 4
 
+    # ── Ancestral inference method ────────────────────────────────────
+    # "voting" (default): two-tier inner/outer outgroup voting.
+    # "parsimony": Fitch parsimony on a phylogenetic tree.
+    #
+    # method: parsimony
+    #
+    # Newick tree topology (required when method is "parsimony").
+    # Can be an inline Newick string or a path to a .nwk file.
+    # Leaf names must match outgroup 'name' fields.
+    # tree: "(((close_species_1,close_species_2),distant_species),outgroup2)"
+
     # Optional evaluation block.  Both sub-sections are independent;
     # include either, both, or neither.
     #

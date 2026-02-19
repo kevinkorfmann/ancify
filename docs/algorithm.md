@@ -345,7 +345,107 @@ Net alignments mitigate paralog confusion by keeping only the best one-to-one ch
 
 ---
 
+## Alternative method: Fitch parsimony
+
+Since version 1.2.0 ancify supports a second inference method: **Fitch parsimony** (Fitch, 1971). Instead of splitting outgroups into two hand-picked tiers and majority-voting within each, this method uses the actual **phylogenetic tree** of the outgroup species to reconstruct the most parsimonious ancestral allele at the root.
+
+### When to prefer parsimony
+
+- You have **three or more outgroups** at varying phylogenetic distances.
+- You want the tree topology to determine how species are weighted, rather than manually choosing inner/outer groups.
+- Resolving cases that the two-tier method marks as "unresolved" (`n`) matters to you. In many of those cases, parsimony can find a unique most-parsimonious solution by leveraging the tree structure.
+
+### The Fitch algorithm
+
+The algorithm runs on a rooted phylogenetic tree whose leaves are the outgroup species. At every genomic position it performs two passes:
+
+**Pass 1: Bottom-up (post-order traversal)**
+
+Starting at the leaves, work toward the root. Each leaf gets a set containing its observed allele (or `{A,C,G,T}` if missing). At each internal node, compute:
+
+- **Intersection** of children's sets, if non-empty
+- **Union** of children's sets, otherwise
+
+The intersection case means all children are compatible; no mutation is needed on the branch. The union case means at least one mutation is required.
+
+```text
+  Example: (((bonobo,chimp),gorilla),macaque)
+  Observed: bonobo=G, chimp=G, gorilla=A, macaque=A
+
+  Bottom-up:
+    bonobo  → {G}       chimp → {G}
+    (bonobo,chimp)      → {G} ∩ {G} = {G}
+    gorilla → {A}
+    ((bc),gorilla)      → {G} ∩ {A} = ∅ → {G} ∪ {A} = {A,G}
+    macaque → {A}
+    root                → {A,G} ∩ {A} = {A}
+```
+
+**Pass 2: Top-down (pre-order traversal)**
+
+Starting at the root, assign a concrete allele from the node's set. Prefer the parent's allele if it is in the child's set (minimizes mutations). Ties are broken alphabetically for determinism.
+
+```text
+  Continuing the example:
+    root  → {A}    → picks A
+    (bc,gorilla) → {A,G} → parent is A, A ∈ set → picks A
+    gorilla      → {A}   → A
+    (bc)         → {G}   → parent is A, A ∉ set → picks G
+    bonobo       → {G}   → G
+    chimp        → {G}   → G
+
+  Result: A is ancestral at the root (1 mutation: A→G on the bonobo-chimp branch)
+```
+
+### Handling missing data
+
+When a leaf has no alignment data (`N`), it is assigned the full set `{A,C,G,T}`. This makes it compatible with any allele, so missing data never forces a mutation. If **all** leaves are missing, the root set remains `{A,C,G,T}` and the position is reported as `N` (missing).
+
+### Confidence encoding (parsimony)
+
+The parsimony method maps to the same case-based confidence encoding as the voting method:
+
+| Character | Confidence | Condition |
+|-----------|-----------|-----------|
+| `ACGT` | **High** | Root Fitch set has exactly one allele (unambiguous) |
+| `acgt` | **Low** | Root Fitch set has multiple alleles (ambiguous; one is chosen) |
+| `N` | **Missing** | All outgroup leaves are `N` |
+
+Note that there is no `n` (unresolved) category for parsimony — the algorithm always produces a call unless all data is missing.
+
+### Comparison: voting vs. parsimony
+
+```text
+  Position with: bonobo=G, chimp=G, gorilla=A, macaque=A
+
+  Two-tier voting:
+    Inner consensus (bonobo, chimp, gorilla) → majority = G
+    Outer consensus (macaque)                → A
+    Inner ≠ Outer → "n" (UNRESOLVED)
+
+  Fitch parsimony on (((bonobo,chimp),gorilla),macaque):
+    Root = A (one mutation needed: A→G on the bonobo-chimp branch)
+    → "A" (HIGH CONFIDENCE)
+```
+
+The tree structure lets parsimony recognize that the G allele is a shared derived change in the bonobo-chimp clade, while A is the ancestral state supported by both gorilla and macaque.
+
+### Configuration
+
+To use parsimony, add two fields to your YAML config:
+
+```yaml
+method: parsimony
+tree: "(((bonobo,chimp),gorilla),macaque)"
+```
+
+The `tree` field accepts either an inline Newick string or a path to a `.nwk` file. Leaf names must match outgroup `name` fields in your config. See {doc}`configuration` for the complete reference.
+
+---
+
 ## Summary
+
+### Two-tier voting (default)
 
 ```text
   For each position in the focal genome:
@@ -361,4 +461,19 @@ Net alignments mitigate paralog confusion by keeping only the best one-to-one ch
   5. Write to output FASTA
 ```
 
-This is simple, fast (Phase 2 takes minutes for a full genome), and produces reliable ancestral calls with built-in confidence assessment.
+### Fitch parsimony
+
+```text
+  For each position in the focal genome:
+
+  1. Gather projected bases from all outgroup species
+  2. Run Fitch bottom-up pass on the phylogenetic tree
+  3. Run Fitch top-down pass to assign the root allele
+  4. Encode confidence:
+       root set size = 1 → UPPERCASE (high confidence)
+       root set size > 1 → lowercase (low confidence)
+       all missing       → N
+  5. Write to output FASTA
+```
+
+Both methods are simple, fast (Phase 2 takes minutes for a full genome), and produce reliable ancestral calls with built-in confidence assessment. Parsimony is more principled for complex outgroup configurations; voting is simpler and well-tested for the common two-tier setup.

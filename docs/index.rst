@@ -5,8 +5,9 @@ ancify
 
 ancify is a config-driven Python pipeline that determines the ancestral state
 at every position in a reference genome by comparing pairwise alignments from
-multiple outgroup species. It uses a two-tier inner/outer outgroup voting
-scheme with case-encoded confidence levels.
+multiple outgroup species. It supports two inference methods: **two-tier voting**
+and **Fitch parsimony** on a phylogenetic tree, both with case-encoded confidence
+levels.
 
 .. code-block:: text
 
@@ -40,6 +41,7 @@ Get started in five minutes:
 Why ancify?
 -----------
 
+- **GPU-accelerated** — optional PyTorch backend turns 12-hour genome-wide runs into ~2 minutes on NVIDIA GPUs. See :doc:`performance`.
 - **Species-agnostic** — works with humans, mice, flies, fish, plants, or any species with outgroup alignments.
 - **Educational** — the docs teach you the population genetics *behind* polarization, not just the buttons to press.
 - **Config-driven** — one YAML file controls everything. No scripts to edit.
@@ -63,6 +65,7 @@ Why ancify?
 
    installation
    configuration
+   performance
    cli
    species_guide
 

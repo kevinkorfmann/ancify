@@ -36,6 +36,10 @@ class PipelineConfig:
     min_inner_freq: int = 1
     min_outer_freq: int = 1
     num_cpus: int = 4
+    backend: str = "auto"
+    gpu_devices: Optional[List[int]] = None
+    method: str = "voting"
+    tree: Optional[str] = None
     evaluation: Optional[EvaluationConfig] = None
 
     def resolve_chromosomes(self):
@@ -50,6 +54,17 @@ class PipelineConfig:
             self.chromosomes = list(lengths.keys())
         return self.chromosomes
 
+    @property
+    def all_outgroups(self) -> "List[OutgroupSpec]":
+        """All outgroup species (inner + outer), deduplicated by name."""
+        seen: set = set()
+        result: list = []
+        for og in self.outgroups_inner + self.outgroups_outer:
+            if og.name not in seen:
+                seen.add(og.name)
+                result.append(og)
+        return result
+
 
 def load_config(path):
     """Load a YAML configuration file and return a PipelineConfig."""
@@ -63,6 +78,14 @@ def load_config(path):
     if raw.get("evaluation"):
         eval_cfg = EvaluationConfig(**raw["evaluation"])
 
+    tree_raw = raw.get("tree")
+    if tree_raw is not None:
+        tree_path = Path(tree_raw)
+        if tree_path.suffix in (".nwk", ".tree", ".newick") or (
+            "(" not in tree_raw and tree_path.is_file()
+        ):
+            tree_raw = tree_path.read_text().strip()
+
     cfg = PipelineConfig(
         focal_species=raw["focal_species"],
         chromosome_lengths=raw["chromosome_lengths"],
@@ -74,6 +97,10 @@ def load_config(path):
         min_inner_freq=raw.get("min_inner_freq", 1),
         min_outer_freq=raw.get("min_outer_freq", 1),
         num_cpus=raw.get("num_cpus", 4),
+        backend=raw.get("backend", "auto"),
+        gpu_devices=raw.get("gpu_devices"),
+        method=raw.get("method", "voting"),
+        tree=tree_raw,
         evaluation=eval_cfg,
     )
 
@@ -86,10 +113,23 @@ def validate_config(cfg):
 
     Raises ValueError with a descriptive message on any problem.
     """
-    if not cfg.outgroups_inner:
-        raise ValueError("At least one inner outgroup species is required.")
-    if not cfg.outgroups_outer:
-        raise ValueError("At least one outer outgroup species is required.")
+    if cfg.method not in ("voting", "parsimony"):
+        raise ValueError(
+            f"Unknown method: {cfg.method!r} (must be 'voting' or 'parsimony')"
+        )
+
+    if cfg.method == "voting":
+        if not cfg.outgroups_inner:
+            raise ValueError("At least one inner outgroup species is required.")
+        if not cfg.outgroups_outer:
+            raise ValueError("At least one outer outgroup species is required.")
+    else:
+        all_outgroups = cfg.outgroups_inner + cfg.outgroups_outer
+        if not all_outgroups:
+            raise ValueError(
+                "At least one outgroup species is required for parsimony."
+            )
+
     if not Path(cfg.chromosome_lengths).exists():
         raise ValueError(
             f"Chromosome lengths file not found: {cfg.chromosome_lengths}"
@@ -98,4 +138,28 @@ def validate_config(cfg):
         if not Path(og.alignment).exists():
             raise ValueError(
                 f"Alignment file not found for {og.name}: {og.alignment}"
+            )
+
+    if cfg.method == "parsimony":
+        if not cfg.tree:
+            raise ValueError(
+                "method 'parsimony' requires a 'tree' field "
+                "(Newick string or path to .nwk file)"
+            )
+        from .parsimony import get_leaf_names, parse_newick
+
+        tree = parse_newick(cfg.tree)
+        leaf_names = set(get_leaf_names(tree))
+        outgroup_names = {
+            og.name for og in cfg.outgroups_inner + cfg.outgroups_outer
+        }
+        missing = leaf_names - outgroup_names
+        if missing:
+            raise ValueError(
+                f"Tree leaf names not found in outgroups: {sorted(missing)}"
+            )
+        extra = outgroup_names - leaf_names
+        if extra:
+            raise ValueError(
+                f"Outgroup names not found as tree leaves: {sorted(extra)}"
             )
