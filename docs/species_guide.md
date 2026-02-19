@@ -97,6 +97,27 @@ num_cpus: 6
 Note the non-`chr` chromosome naming (`2L`, `3R`, etc.) — ancify handles
 any naming convention.
 
+## Example: *Brassica rapa* (plant)
+
+```yaml
+focal_species: brassica_rapa
+chromosome_lengths: braRap1.chromLens.txt
+
+outgroups:
+  inner:
+    - name: brassica_oleracea   # close relative, same genus
+      alignment: braRap1.braOleracea.net.axt.gz
+  outer:
+    - name: arabidopsis_thaliana  # ~20 Mya, same family Brassicaceae
+      alignment: braRap1.araTha1.net.axt.gz
+
+output_dir: ./brassica_rapa_ancestral
+num_cpus: 4
+```
+
+Plant genomes often use different chromosome naming (e.g. A01, A02, …);
+omit the `chromosomes` key to process all entries in the lengths file.
+
 ## Example: Zebrafish (danRer11)
 
 ```yaml

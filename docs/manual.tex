@@ -309,6 +309,7 @@ ancify/                       # project root
 |   |-- hg38_bcgm.yaml       # human worked example
 |   |-- mouse_example.yaml   # mouse hypothetical example
 |   |-- drosophila_example.yaml
+|   |-- brassica_rapa_example.yaml
 |-- ancify/                   # importable Python package
     |-- __init__.py
     |-- __main__.py           # python -m ancify
@@ -892,6 +893,26 @@ num_cpus: 6
 \end{lstlisting}
 
 Note that the chromosome names (\texttt{2L}, \texttt{3R}, etc.) do not have a \texttt{chr} prefix---the package handles any naming convention.
+
+\subsection{Example: \textit{Brassica rapa} (plant)}
+
+\begin{lstlisting}[style=yamlstyle, caption={Hypothetical \textit{Brassica rapa} configuration.}]
+focal_species: brassica_rapa
+chromosome_lengths: braRap1.chromLens.txt
+
+outgroups:
+  inner:
+    - name: brassica_oleracea
+      alignment: braRap1.braOleracea.net.axt.gz
+  outer:
+    - name: arabidopsis_thaliana
+      alignment: braRap1.araTha1.net.axt.gz
+
+output_dir: ./brassica_rapa_ancestral
+num_cpus: 4
+\end{lstlisting}
+
+Plant genomes often use different chromosome naming (e.g.\ A01, A02); omit \texttt{chromosomes} to process all entries in the lengths file.
 
 \subsection{Creating a Chromosome-Lengths File}
 
