@@ -1,0 +1,42 @@
+# ── Mouse (mm39) Ancestral Polarization ─────────────────────────
+# Hypothetical example showing how to adapt the pipeline
+# for a non-human focal species.
+#
+# Inner outgroup : rat (close, ~12 Mya divergence)
+# Outer outgroup : rabbit (~90 Mya divergence)
+#
+# You would need to obtain:
+#   1. Net AXT pairwise alignments from UCSC:
+#      - mm39.rn7.net.axt.gz    (mouse vs rat)
+#      - mm39.oryCun2.net.axt.gz (mouse vs rabbit)
+#   2. A chromosome-lengths file for mm39 (two columns: name, length)
+
+focal_species: mouse
+
+chromosome_lengths: mm39.chromLens.txt
+
+# Omit 'chromosomes' to process all entries in the lengths file.
+# chromosomes:
+#   - chr1
+#   - chr2
+#   - chrX
+
+outgroups:
+  inner:
+    - name: rat
+      alignment: mm39.rn7.net.axt.gz
+  outer:
+    - name: rabbit
+      alignment: mm39.oryCun2.net.axt.gz
+
+work_dir: .
+output_dir: ./mouse_ancestral
+
+min_inner_freq: 1
+min_outer_freq: 1
+num_cpus: 8
+
+# No evaluation data for this example.
+# evaluation:
+#   reference_dir: ...
+#   reference_pattern: ...

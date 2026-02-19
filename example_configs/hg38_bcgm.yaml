@@ -1,0 +1,57 @@
+# ── Human (hg38) BCGM Ancestral Polarization ────────────────────
+# Bonobo-Chimp-Gorilla (inner) + Macaque (outer)
+
+focal_species: human
+
+chromosome_lengths: /sietch_colab/data_share/hg38_anc/chromoLens.txt
+
+chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr6
+  - chr7
+  - chr8
+  - chr9
+  - chr10
+  - chr11
+  - chr12
+  - chr13
+  - chr14
+  - chr15
+  - chr16
+  - chr17
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  - chrX
+  - chrY
+
+outgroups:
+  inner:
+    - name: bonobo
+      alignment: /sietch_colab/data_share/hg38_anc/hg38.panPan3.net.axt.gz
+    - name: chimp
+      alignment: /sietch_colab/data_share/hg38_anc/hg38.panTro6.net.axt.gz
+    - name: gorilla
+      alignment: /sietch_colab/data_share/hg38_anc/hg38.gorGor6.net.axt.gz
+  outer:
+    - name: macaque
+      alignment: /sietch_colab/data_share/hg38_anc/hg38.rheMac10.net.axt.gz
+
+work_dir: /sietch_colab/data_share/hg38_anc
+output_dir: /sietch_colab/data_share/hg38_anc/human_ancestor_bcgm
+
+min_inner_freq: 1
+min_outer_freq: 1
+num_cpus: 24
+
+evaluation:
+  reference_dir: /sietch_colab/data_share/hg38_anc/embi_homo_sapiens_ancestor_GRCh38
+  reference_pattern: "homo_sapiens_ancestor_{chrom_id}.fa"
+  vcf_dir: /sietch_colab/data_share/hg1kg
+  vcf_pattern: "ALL.chr{chrom_id}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz"

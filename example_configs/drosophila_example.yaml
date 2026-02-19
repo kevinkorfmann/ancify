@@ -1,0 +1,37 @@
+# ── Drosophila melanogaster Ancestral Polarization ──────────────
+# Hypothetical example for fruit fly population genetics.
+#
+# Inner outgroup : D. simulans, D. sechellia (melanogaster subgroup)
+# Outer outgroup : D. yakuba (~6 Mya divergence)
+#
+# This demonstrates using two inner outgroups and one outer outgroup
+# with non-"chr" chromosome naming (e.g. "2L", "3R", "X").
+
+focal_species: drosophila_melanogaster
+
+chromosome_lengths: dm6.chromLens.txt
+
+chromosomes:
+  - 2L
+  - 2R
+  - 3L
+  - 3R
+  - 4
+  - X
+
+outgroups:
+  inner:
+    - name: simulans
+      alignment: dm6.droSim2.net.axt.gz
+    - name: sechellia
+      alignment: dm6.droSec1.net.axt.gz
+  outer:
+    - name: yakuba
+      alignment: dm6.droYak3.net.axt.gz
+
+work_dir: .
+output_dir: ./dmel_ancestral
+
+min_inner_freq: 1
+min_outer_freq: 1
+num_cpus: 6
