@@ -1,0 +1,6 @@
+/* Scale sidebar logo to 80% (20% smaller) */
+.wy-side-nav-search > a img.logo,
+.wy-side-nav-search .wy-dropdown > a img.logo {
+    width: 80%;
+    height: auto;
+}
