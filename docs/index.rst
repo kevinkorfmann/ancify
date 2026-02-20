@@ -1,5 +1,9 @@
-ancify
-======
+ancify — decode the root
+=========================
+
+.. container:: epigraph
+
+   The root didn't leave a note. We read the branches instead.
 
 **Ancestral allele polarization for any species.**
 
