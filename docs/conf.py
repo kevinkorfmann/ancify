@@ -37,7 +37,6 @@ html_theme_options = {
     "style_external_links": True,
     "style_nav_header_background": "#2c3e50",
     "titles_only": False,
-    "display_version": True,
 }
 
 html_context = {

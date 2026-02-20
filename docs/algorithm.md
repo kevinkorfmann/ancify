@@ -443,6 +443,103 @@ The `tree` field accepts either an inline Newick string or a path to a `.nwk` fi
 
 ---
 
+## Alternative method: Machine learning classifier
+
+Since version 2.0.0 ancify supports a third inference method: a **LightGBM gradient-boosted classifier** that learns substitution patterns from data rather than relying on hand-crafted rules.
+
+### When to prefer ML
+
+- You have an external **reference ancestral sequence** (e.g. Ensembl EPO) that can serve as high-quality training labels.
+- You want the model to learn **substitution biases** (transition/transversion asymmetry, CpG hypermutation) and **local sequence context** automatically.
+- You want **calibrated probability scores** rather than the binary high/low confidence split of voting, or the ambiguous/unambiguous split of parsimony.
+- Resolving the ~0.1% of sites that voting marks as "unresolved" (`n`) matters to you.
+
+### Feature engineering
+
+At every genomic position, the classifier receives a feature vector built from the projected outgroup sequences:
+
+```text
+  Feature                 Description                                     Count
+  ──────────────────────  ──────────────────────────────────────────────  ─────
+  Outgroup bases          Integer-encoded base per outgroup (0-3, -1=N)  K
+  Data count              Number of outgroups with valid data             1
+  Agreement ratio         Fraction of valid outgroups agreeing w/ majority 1
+  Inner consensus         Majority base among inner outgroups (0-4)      1
+  Outer consensus         Majority base among outer outgroups (0-4)      1
+  Voting agreement        Whether inner == outer (binary)                1
+  GC content              GC fraction in ±50 bp window                   1
+  CpG flag                Whether site is part of a CpG dinucleotide     1
+  Flanking bases          Bases immediately upstream/downstream           2
+  ──────────────────────────────────────────────────────────────────────────
+  Total                                                                  K + 9
+```
+
+The first K features capture raw outgroup data. The next five features encode the same information the voting method uses, letting the model learn when voting is reliable. The final four context features let the model learn position-dependent substitution biases (e.g. elevated C→T rates at CpG sites).
+
+### Training workflow
+
+Training is a separate step from inference:
+
+```bash
+# Train a model using high-confidence voting sites (self-supervised):
+ancify train -c config.yaml -o model.lgb
+
+# Or, with an external reference for training labels:
+# (set ml_training_reference in config.yaml)
+ancify train -c config.yaml -o model.lgb
+```
+
+Two label sources are supported:
+
+1. **Self-supervised** (default): Positions where the voting method's inner and outer tiers agree (uppercase output) serve as training labels. No external data is needed.
+2. **Reference-supervised**: An external ancestral reference (e.g. Ensembl EPO) provides ground-truth labels via the `ml_training_reference` config field. This is preferred when available.
+
+Training subsamples up to ~5 million sites per chromosome (stratified by allele class) to keep training fast (<5 minutes for a full genome).
+
+### Confidence calibration
+
+The model's predicted class probability maps to confidence levels:
+
+```text
+  ┌────────────────────────────────┬──────────────┬─────────────────────────────┐
+  │ Condition                      │ Output       │ Interpretation              │
+  ├────────────────────────────────┼──────────────┼─────────────────────────────┤
+  │ p >= high_threshold (def 0.8)  │ ACGT (upper) │ High confidence             │
+  │ p >= low_threshold  (def 0.5)  │ acgt (lower) │ Low confidence              │
+  │ p <  low_threshold             │ n            │ Unresolved                  │
+  │ All outgroups missing          │ N            │ No data                     │
+  └────────────────────────────────┴──────────────┴─────────────────────────────┘
+```
+
+This is more informative than the binary high/low split of voting or parsimony, because the probability thresholds can be tuned to trade precision for recall.
+
+### Comparison: voting vs. parsimony vs. ML
+
+```text
+  Position with: bonobo=G, chimp=G, gorilla=A, macaque=A
+
+  Two-tier voting:
+    Inner consensus = G, Outer consensus = A → DISAGREEMENT → "n"
+
+  Fitch parsimony:
+    Root = A (one mutation: A→G on bonobo-chimp branch) → "A"
+
+  ML classifier:
+    Sees outgroup bases + local context (CpG site, high GC region)
+    Predicts A with probability 0.87 → "A" (high confidence)
+```
+
+The ML method can resolve cases like this by learning that the G→A pattern at a CpG site in a GC-rich region is more consistent with ancestral A than derived A, using patterns it has learned from the training data.
+
+### Why LightGBM?
+
+- **Tabular data**: The per-position feature space is naturally tabular, not sequential. Gradient-boosted trees outperform neural networks on tabular data in most benchmarks.
+- **Native missing-value handling**: LightGBM handles `NaN` / missing features natively, which is critical for positions where some outgroups lack alignment data.
+- **Speed**: Training on ~5M sites takes <5 minutes; inference on a full genome takes minutes.
+- **Interpretable**: Feature importance scores show which outgroups and context features drive predictions, which is valuable for a scientific tool.
+
+---
+
 ## Summary
 
 ### Two-tier voting (default)
@@ -476,4 +573,23 @@ The `tree` field accepts either an inline Newick string or a path to a `.nwk` fi
   5. Write to output FASTA
 ```
 
-Both methods are simple, fast (Phase 2 takes minutes for a full genome), and produce reliable ancestral calls with built-in confidence assessment. Parsimony is more principled for complex outgroup configurations; voting is simpler and well-tested for the common two-tier setup.
+### ML classifier
+
+```text
+  Prerequisite: train a model with `ancify train -c config.yaml`
+
+  For each position in the focal genome:
+
+  1. Gather projected bases from all outgroup species
+  2. Extract feature vector (outgroup bases, voting consensus,
+     agreement, GC content, CpG flag, flanking bases)
+  3. Run LightGBM inference → predicted class + probability
+  4. Encode confidence:
+       p >= high_threshold → UPPERCASE (high confidence)
+       p >= low_threshold  → lowercase (low confidence)
+       p <  low_threshold  → n (unresolved)
+       all missing         → N
+  5. Write to output FASTA
+```
+
+All three methods are fast (Phase 2 takes minutes for a full genome) and produce reliable ancestral calls with built-in confidence assessment. Voting is the simplest and best-tested; parsimony is more principled for complex outgroup configurations; ML can learn substitution biases and local context when training data is available.

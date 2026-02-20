@@ -93,8 +93,12 @@ Each outgroup entry requires:
 | `num_cpus` | `4` | Number of parallel worker processes |
 | `backend` | `auto` | Compute backend: `"auto"`, `"cpu"`, or `"gpu"` (see {doc}`performance`) |
 | `gpu_devices` | all available | List of GPU device IDs to use, e.g. `[0, 1, 2]` |
-| `method` | `voting` | Ancestral inference method: `"voting"` or `"parsimony"` (see {doc}`algorithm`) |
+| `method` | `voting` | Ancestral inference method: `"voting"`, `"parsimony"`, or `"ml"` (see {doc}`algorithm`) |
 | `tree` | none | Newick tree of outgroup species (required when `method: parsimony`). Inline string or path to `.nwk` file. |
+| `ml_model_path` | none | Path to a trained LightGBM model file (required when `method: ml`). Produced by `ancify train`. |
+| `ml_training_reference` | none | Directory of reference ancestral FASTAs for supervised training (optional; used by `ancify train`). |
+| `ml_high_threshold` | `0.8` | Minimum predicted probability for high (uppercase) confidence. |
+| `ml_low_threshold` | `0.5` | Minimum predicted probability for low (lowercase) confidence. Below this → `n`. |
 | `evaluation` | none | Optional evaluation block (see below) |
 
 ### Evaluation fields
@@ -330,6 +334,56 @@ You can also point `tree` to an external file:
 
 ```yaml
 tree: species_tree.nwk
+```
+
+### ML classifier
+
+The ML method requires a two-step workflow: train first, then call.
+
+**Step 1: Train** (uses high-confidence voting sites as labels by default):
+
+```yaml
+focal_species: human
+chromosome_lengths: chromoLens.txt
+outgroups:
+  inner:
+    - name: bonobo
+      alignment: hg38.panPan3.net.axt.gz
+    - name: chimp
+      alignment: hg38.panTro6.net.axt.gz
+    - name: gorilla
+      alignment: hg38.gorGor6.net.axt.gz
+  outer:
+    - name: macaque
+      alignment: hg38.rheMac10.net.axt.gz
+output_dir: ./human_ancestral_ml
+```
+
+```bash
+ancify train -c config.yaml -o model.lgb
+```
+
+To use an external reference (e.g. Ensembl EPO) as training labels instead, add:
+
+```yaml
+ml_training_reference: /data/ensembl_ancestor/
+```
+
+The reference directory should contain one FASTA per chromosome (e.g. `chr1.fa`).
+
+**Step 2: Call** (add the trained model path and set `method: ml`):
+
+```yaml
+method: ml
+ml_model_path: model.lgb
+
+# Optional: tune confidence thresholds (defaults shown)
+ml_high_threshold: 0.8
+ml_low_threshold: 0.5
+```
+
+```bash
+ancify call -c config.yaml
 ```
 
 ### Quick test run (single chromosome)

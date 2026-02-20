@@ -7,6 +7,7 @@ Usage::
     ancify call -c config.yaml           # Phase 2: call ancestral states
     ancify evaluate -c config.yaml       # Phase 3: evaluate calls
     ancify run -c config.yaml            # run all phases
+    ancify train -c config.yaml [-o model.lgb]  # train ML model
 
 The package can also be invoked as ``python -m ancify <cmd> ...``.
 """
@@ -131,6 +132,17 @@ def cmd_evaluate(args):
     run_evaluation(cfg)
 
 
+def cmd_train(args):
+    cfg = load_config(args.config)
+    if args.num_cpus:
+        cfg.num_cpus = args.num_cpus
+    if args.output:
+        cfg.ml_model_path = args.output
+    from .ml import train_from_config
+    out_path = train_from_config(cfg)
+    print(f"Trained ML model saved to {out_path}")
+
+
 def cmd_run(args):
     cfg = load_config(args.config)
     if args.num_cpus:
@@ -173,6 +185,15 @@ def main():
         p.add_argument("-n", "--num-cpus", type=int,
                        help="override num_cpus from config")
         p.set_defaults(func=func)
+
+    p = sub.add_parser("train", help="train an ML model for ancestral calling")
+    p.add_argument("-c", "--config", required=True,
+                   help="path to YAML configuration file")
+    p.add_argument("-o", "--output",
+                   help="output path for trained model (default: from config or work_dir)")
+    p.add_argument("-n", "--num-cpus", type=int,
+                   help="override num_cpus from config")
+    p.set_defaults(func=cmd_train)
 
     args = parser.parse_args()
     _setup_logging(getattr(args, "verbose", False))

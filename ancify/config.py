@@ -40,6 +40,10 @@ class PipelineConfig:
     gpu_devices: Optional[List[int]] = None
     method: str = "voting"
     tree: Optional[str] = None
+    ml_model_path: Optional[str] = None
+    ml_training_reference: Optional[str] = None
+    ml_high_threshold: float = 0.8
+    ml_low_threshold: float = 0.5
     evaluation: Optional[EvaluationConfig] = None
 
     def resolve_chromosomes(self):
@@ -101,6 +105,10 @@ def load_config(path):
         gpu_devices=raw.get("gpu_devices"),
         method=raw.get("method", "voting"),
         tree=tree_raw,
+        ml_model_path=raw.get("ml_model_path"),
+        ml_training_reference=raw.get("ml_training_reference"),
+        ml_high_threshold=float(raw.get("ml_high_threshold", 0.8)),
+        ml_low_threshold=float(raw.get("ml_low_threshold", 0.5)),
         evaluation=eval_cfg,
     )
 
@@ -113,9 +121,10 @@ def validate_config(cfg):
 
     Raises ValueError with a descriptive message on any problem.
     """
-    if cfg.method not in ("voting", "parsimony"):
+    if cfg.method not in ("voting", "parsimony", "ml"):
         raise ValueError(
-            f"Unknown method: {cfg.method!r} (must be 'voting' or 'parsimony')"
+            f"Unknown method: {cfg.method!r} "
+            "(must be 'voting', 'parsimony', or 'ml')"
         )
 
     if cfg.method == "voting":
@@ -123,6 +132,20 @@ def validate_config(cfg):
             raise ValueError("At least one inner outgroup species is required.")
         if not cfg.outgroups_outer:
             raise ValueError("At least one outer outgroup species is required.")
+    elif cfg.method == "ml":
+        if not cfg.outgroups_inner:
+            raise ValueError("At least one inner outgroup species is required.")
+        if not cfg.outgroups_outer:
+            raise ValueError("At least one outer outgroup species is required.")
+        if cfg.ml_model_path and not Path(cfg.ml_model_path).exists():
+            raise ValueError(
+                f"ML model file not found: {cfg.ml_model_path}"
+            )
+        if not (0.0 <= cfg.ml_low_threshold <= cfg.ml_high_threshold <= 1.0):
+            raise ValueError(
+                "ML thresholds must satisfy 0 <= low <= high <= 1; "
+                f"got low={cfg.ml_low_threshold}, high={cfg.ml_high_threshold}"
+            )
     else:
         all_outgroups = cfg.outgroups_inner + cfg.outgroups_outer
         if not all_outgroups:

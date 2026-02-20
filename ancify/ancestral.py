@@ -184,14 +184,14 @@ def run_ancestral_calling(config):
     Reads projected FASTA files from ``<work_dir>/projected/<species>/``
     and writes ancestral FASTA files to ``<output_dir>/<chrom>.fa``.
 
-    When ``method`` is ``"parsimony"``, uses the Fitch algorithm with the
-    configured phylogenetic tree.  Otherwise falls back to the two-tier
-    voting scheme, optionally GPU-accelerated.
+    Supported methods: ``"voting"`` (default), ``"parsimony"``, ``"ml"``.
     """
     method = getattr(config, "method", "voting")
 
     if method == "parsimony":
         return _run_parsimony(config)
+    if method == "ml":
+        return _run_ml(config)
 
     _run_voting(config)
 
@@ -222,6 +222,54 @@ def _run_parsimony(config):
     with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
         futures = {
             pool.submit(_call_chromosome_parsimony, t): t for t in tasks
+        }
+        for future in as_completed(futures):
+            chrom = future.result()
+            logger.info("  Completed %s", chrom)
+
+    logger.info("Phase 2 complete.")
+
+
+def _run_ml(config):
+    """ML-based ancestral calling for all chromosomes."""
+    from .ml import _call_chromosome_ml
+
+    chromosomes = config.resolve_chromosomes()
+    work = Path(config.work_dir)
+    out_dir = Path(config.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = config.ml_model_path
+    if not model_path:
+        raise ValueError(
+            "method 'ml' requires 'ml_model_path' pointing to a trained model. "
+            "Run 'ancify train' first."
+        )
+
+    tasks = []
+    for chrom in chromosomes:
+        inner_paths = [
+            str(work / "projected" / og.name / f"{chrom}.fa")
+            for og in config.outgroups_inner
+        ]
+        outer_paths = [
+            str(work / "projected" / og.name / f"{chrom}.fa")
+            for og in config.outgroups_outer
+        ]
+        out_path = str(out_dir / f"{chrom}.fa")
+        tasks.append((
+            chrom, inner_paths, outer_paths, out_path,
+            model_path, config.ml_high_threshold, config.ml_low_threshold,
+        ))
+
+    logger.info(
+        "Phase 2: calling ancestral states for %d chromosomes [ml]",
+        len(tasks),
+    )
+
+    with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
+        futures = {
+            pool.submit(_call_chromosome_ml, t): t for t in tasks
         }
         for future in as_completed(futures):
             chrom = future.result()
