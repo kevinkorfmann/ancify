@@ -1,5 +1,5 @@
-ancify - A fast and flexible pipeline for ancestral allele polarization
-=========================================================================
+ancify — Fast ancestral allele polarization from outgroup alignments
+================================================================
 
 
 **Ancestral allele polarization for any species.**
