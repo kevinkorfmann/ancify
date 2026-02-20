@@ -290,6 +290,10 @@ The tables below list 100 commonly studied species with suggested outgroup confi
 These are starting-point suggestions. Always verify that pairwise net AXT alignments exist for your chosen focal assembly at `https://hgdownload.soe.ucsc.edu/goldenPath/<assembly>/`. If a pre-computed alignment is not available, you can generate your own with [lastz](https://lastz.github.io/lastz/) and the UCSC [axtChain/chainNet](https://genome.ucsc.edu/goldenPath/help/chain.html) pipeline.
 :::
 
+:::{important}
+**Disclaimer — verify divergence times independently.** The divergence times and outgroup configurations in this catalogue are approximate, drawn from molecular clock estimates in the published literature. They are provided as a convenience and **may contain errors**. Molecular divergence estimates vary substantially between studies depending on calibration fossils, clock models, and gene sets used. Before relying on any entry for your analysis, please cross-check the divergence times against an authoritative source such as [TimeTree](https://timetree.org/) or the primary literature for your taxon. The authors of ancify make no guarantee of the accuracy of these values and accept no responsibility for downstream results based on incorrect tier assignments.
+:::
+
 ### Primates
 
 | # | Focal species | Common name | Assembly | Suggested inner outgroups | Suggested outer outgroup | Div. (inner / outer) |
