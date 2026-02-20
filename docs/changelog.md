@@ -88,7 +88,7 @@ GPU acceleration and a vectorized compute backend for much faster Phase 1 and Ph
 - **Bit-identical output.** Vectorized and GPU code paths produce the same results as the original scalar implementation. Tie-breaking, `min_inner_freq` / `min_outer_freq` behaviour, and case-encoded confidence are unchanged.
 - **New documentation page:** {doc}`performance` with GPU setup, supported hardware, architecture overview, and tuning tips.
 
-## 1.0.0 (2025)
+## 1.0.0 (2026)
 
 Initial release.
 
