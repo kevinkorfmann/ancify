@@ -8,7 +8,9 @@ cd ancify
 pip install .
 ```
 
-That is all you need for the core pipeline (Phases 1 and 2).
+That is all you need for the core pipeline (Phases 1 and 2). The **voting**,
+**parsimony**, and **likelihood** inference methods work out of the box; SciPy
+is included for the likelihood method.
 
 ## Install options
 
@@ -82,6 +84,7 @@ uv pip install '.[all]'
 | Python | >= 3.8 | Yes | Runtime |
 | PyYAML | >= 5.0 | Yes | YAML config parsing |
 | NumPy | >= 1.20 | Yes | Array operations in projection and calling |
+| SciPy | >= 1.7 | Yes | Likelihood method (matrix exponentiation for substitution models) |
 | PyTorch | >= 2.0 | No | GPU-accelerated ancestral calling — `pip install 'ancify[fast]'` + PyTorch (see {doc}`performance`) |
 | isal | >= 1.0 | No | 2–5× faster gzip decompression for Phase 1 — `pip install 'ancify[fast]'` |
 | lightgbm | >= 4.0 | No | ML-based ancestral calling (`method: ml`) — `pip install 'ancify[ml]'` |
@@ -99,17 +102,18 @@ ancify --help
 Expected output:
 
 ```text
-usage: ancify [-h] [-v] {init,project,call,evaluate,run} ...
+usage: ancify [-h] [-v] {init,project,call,evaluate,run,train} ...
 
 Ancestral allele polarization pipeline.
 
 positional arguments:
-  {init,project,call,evaluate,run}
+  {init,project,call,evaluate,run,train}
     init                Generate a template configuration file
     project             Phase 1: project outgroup alignments
     call                Phase 2: call ancestral alleles
     evaluate            Phase 3: evaluate calls
     run                 Run all phases
+    train               Train an ML model for ancestral calling
 
 optional arguments:
   -h, --help            show this help message and exit

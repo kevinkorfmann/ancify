@@ -7,7 +7,7 @@ ancify provides a single CLI command with several subcommands. It can be invoked
 ## Synopsis
 
 ```text
-ancify [-h] [-v] {init,project,call,evaluate,run} ...
+ancify [-h] [-v] {init,project,call,evaluate,run,train} ...
 ```
 
 ## Global options
@@ -64,7 +64,7 @@ ancify call -c config.yaml -n 4
 | `-c`, `--config` | Path to YAML config file (**required**) |
 | `-n`, `--num-cpus` | Override `num_cpus` from config |
 
-**What it does:** Reads projected FASTA files, computes two-tier majority voting at every position, and writes confidence-encoded ancestral FASTA files.
+**What it does:** Reads projected FASTA files, infers the ancestral allele at every position using the configured method (voting, parsimony, likelihood, or ML), and writes confidence-encoded ancestral FASTA files.
 
 **Output:** `<output_dir>/<chrom>.fa` for each chromosome.
 
@@ -101,6 +101,23 @@ ancify -v run -c config.yaml          # verbose output
 | `-n`, `--num-cpus` | Override `num_cpus` from config |
 
 **What it does:** Runs Phase 1 → Phase 2 → Phase 3 in sequence. Phase 3 is skipped if the `evaluation` block is absent.
+
+### `ancify train` — Train an ML model
+
+```bash
+ancify train -c config.yaml
+ancify train -c config.yaml -o model.lgb -n 4
+```
+
+| Option | Description |
+|--------|-------------|
+| `-c`, `--config` | Path to YAML config file (**required**) |
+| `-o`, `--output` | Output path for the trained model (default: from config or `work_dir`) |
+| `-n`, `--num-cpus` | Override `num_cpus` from config |
+
+**What it does:** Trains a LightGBM classifier for use with `method: ml`. Uses high-confidence voting sites as labels by default, or an external reference if `ml_training_reference` is set. Run this once before using `method: ml` in your config.
+
+**Requires:** `lightgbm` and `scikit-learn` (e.g. `pip install '.[ml]'`).
 
 ---
 

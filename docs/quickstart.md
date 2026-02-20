@@ -27,7 +27,7 @@ Verify it worked:
 ancify --help
 ```
 
-You should see a help message listing the available subcommands (`init`, `project`, `call`, `evaluate`, `run`).
+You should see a help message listing the available subcommands (`init`, `project`, `call`, `evaluate`, `run`, `train`).
 
 ## Step 2: Generate a config template
 
@@ -74,8 +74,8 @@ Not working with humans? See {doc}`species_guide` for ready-made configs for mou
 
 ### Choosing an inference method
 
-The config above uses the default **two-tier voting** method. ancify supports two
-additional methods — just add one line to your YAML:
+The config above uses the default **two-tier voting** method. ancify supports
+three additional methods — set `method` and any required fields:
 
 ```yaml
 # Two-tier majority vote (default — no extra config needed)
@@ -84,6 +84,12 @@ method: voting
 # Fitch parsimony on a phylogenetic tree
 method: parsimony
 tree: "(((bonobo,chimp),gorilla),macaque)"
+
+# Likelihood: Felsenstein pruning with substitution model (tree must have branch lengths)
+method: likelihood
+tree: "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)"
+substitution_model: HKY85
+model_kappa: 2.0
 
 # LightGBM ML classifier (requires ancify[ml] and a trained model)
 method: ml
@@ -217,7 +223,7 @@ For a deeper understanding of the algorithm — including the Fitch parsimony an
 | I want to... | Go to... |
 |--------------|----------|
 | Speed up runs with GPU acceleration | {doc}`performance` |
-| Use the ML classifier or Fitch parsimony | {doc}`algorithm` |
+| Use Fitch parsimony, likelihood, or the ML classifier | {doc}`algorithm` |
 | See every YAML field including GPU and ML | {doc}`configuration` |
 | Understand the biology behind polarization | {doc}`background` |
 | Walk through a complete worked example | {doc}`tutorials` |
