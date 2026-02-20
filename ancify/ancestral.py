@@ -192,6 +192,8 @@ def run_ancestral_calling(config):
         return _run_parsimony(config)
     if method == "ml":
         return _run_ml(config)
+    if method == "likelihood":
+        return _run_likelihood(config)
 
     _run_voting(config)
 
@@ -222,6 +224,48 @@ def _run_parsimony(config):
     with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
         futures = {
             pool.submit(_call_chromosome_parsimony, t): t for t in tasks
+        }
+        for future in as_completed(futures):
+            chrom = future.result()
+            logger.info("  Completed %s", chrom)
+
+    logger.info("Phase 2 complete.")
+
+
+def _run_likelihood(config):
+    """Likelihood-based ancestral calling for all chromosomes."""
+    from .likelihood import _call_chromosome_likelihood
+
+    chromosomes = config.resolve_chromosomes()
+    work = Path(config.work_dir)
+    out_dir = Path(config.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    all_outgroups = config.outgroups_inner + config.outgroups_outer
+
+    tasks = []
+    for chrom in chromosomes:
+        species_paths = {
+            og.name: str(work / "projected" / og.name / f"{chrom}.fa")
+            for og in all_outgroups
+        }
+        out_path = str(out_dir / f"{chrom}.fa")
+        tasks.append((
+            chrom, species_paths, config.tree,
+            config.substitution_model, config.model_kappa,
+            config.model_base_freqs, config.model_rates,
+            config.likelihood_high_threshold, config.likelihood_low_threshold,
+            out_path,
+        ))
+
+    logger.info(
+        "Phase 2: calling ancestral states for %d chromosomes [likelihood]",
+        len(tasks),
+    )
+
+    with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
+        futures = {
+            pool.submit(_call_chromosome_likelihood, t): t for t in tasks
         }
         for future in as_completed(futures):
             chrom = future.result()

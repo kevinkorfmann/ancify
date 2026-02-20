@@ -44,6 +44,12 @@ class PipelineConfig:
     ml_training_reference: Optional[str] = None
     ml_high_threshold: float = 0.8
     ml_low_threshold: float = 0.5
+    substitution_model: str = "JC69"
+    model_kappa: float = 2.0
+    model_base_freqs: Optional[List[float]] = None
+    model_rates: Optional[List[float]] = None
+    likelihood_high_threshold: float = 0.8
+    likelihood_low_threshold: float = 0.5
     evaluation: Optional[EvaluationConfig] = None
 
     def resolve_chromosomes(self):
@@ -109,6 +115,12 @@ def load_config(path):
         ml_training_reference=raw.get("ml_training_reference"),
         ml_high_threshold=float(raw.get("ml_high_threshold", 0.8)),
         ml_low_threshold=float(raw.get("ml_low_threshold", 0.5)),
+        substitution_model=raw.get("substitution_model", "JC69"),
+        model_kappa=float(raw.get("model_kappa", 2.0)),
+        model_base_freqs=raw.get("model_base_freqs"),
+        model_rates=raw.get("model_rates"),
+        likelihood_high_threshold=float(raw.get("likelihood_high_threshold", 0.8)),
+        likelihood_low_threshold=float(raw.get("likelihood_low_threshold", 0.5)),
         evaluation=eval_cfg,
     )
 
@@ -121,10 +133,10 @@ def validate_config(cfg):
 
     Raises ValueError with a descriptive message on any problem.
     """
-    if cfg.method not in ("voting", "parsimony", "ml"):
+    if cfg.method not in ("voting", "parsimony", "ml", "likelihood"):
         raise ValueError(
             f"Unknown method: {cfg.method!r} "
-            "(must be 'voting', 'parsimony', or 'ml')"
+            "(must be 'voting', 'parsimony', 'ml', or 'likelihood')"
         )
 
     if cfg.method == "voting":
@@ -146,6 +158,39 @@ def validate_config(cfg):
                 "ML thresholds must satisfy 0 <= low <= high <= 1; "
                 f"got low={cfg.ml_low_threshold}, high={cfg.ml_high_threshold}"
             )
+    elif cfg.method == "likelihood":
+        all_outgroups = cfg.outgroups_inner + cfg.outgroups_outer
+        if not all_outgroups:
+            raise ValueError(
+                "At least one outgroup species is required for likelihood."
+            )
+        valid_models = ("JC69", "K80", "HKY85", "GTR")
+        if cfg.substitution_model.upper() not in valid_models:
+            raise ValueError(
+                f"Unknown substitution_model: {cfg.substitution_model!r} "
+                f"(must be one of {valid_models})"
+            )
+        if cfg.substitution_model.upper() == "GTR":
+            if cfg.model_rates is None or len(cfg.model_rates) != 6:
+                raise ValueError(
+                    "substitution_model 'GTR' requires 'model_rates' "
+                    "with exactly 6 exchangeability rates [AC, AG, AT, CG, CT, GT]"
+                )
+        if cfg.model_base_freqs is not None:
+            if len(cfg.model_base_freqs) != 4:
+                raise ValueError(
+                    "'model_base_freqs' must have exactly 4 values [A, C, G, T]"
+                )
+            total = sum(cfg.model_base_freqs)
+            if abs(total - 1.0) > 0.01:
+                raise ValueError(
+                    f"'model_base_freqs' must sum to ~1.0 (got {total:.4f})"
+                )
+        if not (0.0 <= cfg.likelihood_low_threshold <= cfg.likelihood_high_threshold <= 1.0):
+            raise ValueError(
+                "Likelihood thresholds must satisfy 0 <= low <= high <= 1; "
+                f"got low={cfg.likelihood_low_threshold}, high={cfg.likelihood_high_threshold}"
+            )
     else:
         all_outgroups = cfg.outgroups_inner + cfg.outgroups_outer
         if not all_outgroups:
@@ -163,10 +208,10 @@ def validate_config(cfg):
                 f"Alignment file not found for {og.name}: {og.alignment}"
             )
 
-    if cfg.method == "parsimony":
+    if cfg.method in ("parsimony", "likelihood"):
         if not cfg.tree:
             raise ValueError(
-                "method 'parsimony' requires a 'tree' field "
+                f"method {cfg.method!r} requires a 'tree' field "
                 "(Newick string or path to .nwk file)"
             )
         from .parsimony import get_leaf_names, parse_newick

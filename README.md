@@ -3,9 +3,10 @@
 **Infer ancestral alleles for any species using outgroup alignments.**
 
 [![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-blue)](https://ancify.readthedocs.io)
-[![Tests](https://img.shields.io/badge/tests-245%20passed-brightgreen)](https://github.com/kevinkorfmann/ancify/actions)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/kevinkorfmann/ancify/actions)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 
-ancify is a config-driven Python pipeline that determines the ancestral state at every position in a reference genome by comparing pairwise alignments from multiple outgroup species. It supports two inference methods: a **two-tier inner/outer outgroup voting** scheme and **Fitch parsimony** on a phylogenetic tree, both with case-encoded confidence levels.
+ancify is a config-driven Python pipeline that determines the ancestral state at every position in a reference genome by comparing pairwise alignments from multiple outgroup species. It supports **four inference methods**: **two-tier inner/outer outgroup voting**, **Fitch parsimony** on a phylogenetic tree, **likelihood-based reconstruction** (Felsenstein pruning with substitution models JC69/K80/HKY85/GTR), and a **LightGBM classifier** — all with case-encoded confidence levels.
 
 **Full documentation:** [ancify.readthedocs.io](https://ancify.readthedocs.io) — includes a population genetics background primer, step-by-step tutorials, algorithm deep dives, and a species adaptation guide.
 
@@ -47,7 +48,7 @@ Net AXT alignments          Projected sequences         Ancestral FASTA
 ```
 
 **Phase 1** projects each outgroup alignment onto the focal genome's coordinates.
-**Phase 2** infers the ancestral allele at every position using majority voting.
+**Phase 2** infers the ancestral allele at every position using your chosen method (voting, parsimony, likelihood, or ML).
 **Phase 3** (optional) evaluates calls against a reference and/or VCF variants.
 
 ### Confidence Encoding
@@ -69,20 +70,110 @@ Net AXT alignments          Projected sequences         Ancestral FASTA
 | `acgt` | Low | Ambiguous root (multiple equally parsimonious states) |
 | `N` | Missing | All outgroup leaves lack data |
 
+**Likelihood method** (Felsenstein pruning):
+
+| Character | Confidence | Meaning |
+|-----------|-----------|---------|
+| `ACGT` | High | Root posterior ≥ high threshold (default 0.8) |
+| `acgt` | Low | Root posterior ≥ low threshold (default 0.5) |
+| `n` | Unresolved | Root posterior &lt; low threshold |
+| `N` | Missing | All outgroup leaves lack data |
+
+**ML method**: same as voting (probability thresholds map to uppercase/lowercase/`n`/`N`).
+
 ---
 
 ## Installation
+
+### Prerequisites
+
+- **Python 3.8 or newer**
+- **pip** (or another PEP 517–compatible installer)
+
+Optional: a [virtual environment](https://docs.python.org/3/library/venv.html) is recommended to isolate dependencies.
+
+### Core install (voting, parsimony, likelihood)
+
+Clone the repository and install in editable or regular mode:
 
 ```bash
 git clone https://github.com/kevinkorfmann/ancify.git
 cd ancify
 pip install .
-
-# with evaluation dependencies (scikit-allel, matplotlib):
-pip install '.[evaluate]'
 ```
 
-**Requirements:** Python >= 3.8, PyYAML, NumPy.
+This pulls in the core dependencies: **PyYAML**, **NumPy**, **SciPy** (for the likelihood method), and **LightGBM**. The **voting**, **parsimony**, and **likelihood** inference methods work out of the box.
+
+**From a tarball or wheel (if you have a release):**
+
+```bash
+pip install ancify
+# or
+pip install dist/ancify-*.whl
+```
+
+### Optional extras
+
+Install optional dependency groups with the `[extra]` syntax:
+
+| Extra        | Purpose |
+|-------------|---------|
+| `evaluate` | Phase 3 evaluation: scikit-allel, matplotlib (reference & VCF comparison) |
+| `fast`     | Faster gzip I/O via `isal` |
+| `ml`       | ML method: LightGBM, scikit-learn (already in core; this adds sklearn explicitly) |
+| `docs`     | Build Sphinx docs: sphinx, theme, myst-parser |
+| `dev`      | Testing: pytest |
+| `all`      | All of the above |
+
+**Examples:**
+
+```bash
+# Core + evaluation (reference comparison, VCF concordance)
+pip install '.[evaluate]'
+
+# Core + faster gzip for large AXT files
+pip install '.[fast]'
+
+# Core + evaluation + fast I/O
+pip install '.[evaluate,fast]'
+
+# Everything (development and docs)
+pip install '.[all]'
+```
+
+### GPU acceleration (voting method only)
+
+The **voting** method can use PyTorch with CUDA to process full genomes in minutes instead of hours. The **parsimony**, **likelihood**, and **ML** methods run on CPU (multi-process).
+
+1. Install ancify first (as above).
+2. Install PyTorch with CUDA for your driver (example: CUDA 12.8):
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+3. In your config, use `backend: auto` (default) so ancify will use the GPU if available, or `backend: gpu` to require it.
+
+See the [performance docs](https://ancify.readthedocs.io/en/latest/performance.html) for supported setups and benchmarks.
+
+### Verify installation
+
+```bash
+ancify --help
+python -c "from ancify.config import load_config; from ancify.likelihood import build_model; print('ok')"
+```
+
+---
+
+### Installation quick reference
+
+| What you want              | Command |
+|----------------------------|---------|
+| Minimal (voting, parsimony, likelihood) | `pip install .` |
+| + Phase 3 evaluation       | `pip install '.[evaluate]'` |
+| + Faster gzip              | `pip install '.[fast]'` |
+| + GPU (voting only)        | `pip install .` then `pip install torch --index-url ...` |
+| Dev/test                   | `pip install '.[dev]'` |
 
 ---
 
@@ -127,8 +218,12 @@ num_cpus: 24
 | `outgroups.outer` | Distantly related species (independent check) |
 | `min_inner_freq` | Min count for inner majority vote (default: 1) |
 | `min_outer_freq` | Min count for outer majority vote (default: 1) |
-| `method` | `"voting"` (default) or `"parsimony"` |
-| `tree` | Newick tree string or path to `.nwk` file (required for parsimony) |
+| `method` | `"voting"` (default), `"parsimony"`, `"likelihood"`, or `"ml"` |
+| `tree` | Newick tree (required for parsimony/likelihood); use branch lengths for likelihood |
+| `substitution_model` | For likelihood: `JC69`, `K80`, `HKY85`, or `GTR` (default: JC69) |
+| `model_kappa`, `model_base_freqs`, `model_rates` | Likelihood model parameters (see docs) |
+| `likelihood_high_threshold`, `likelihood_low_threshold` | Posterior thresholds for likelihood (defaults 0.8, 0.5) |
+| `ml_model_path`, `ml_high_threshold`, `ml_low_threshold` | For ML method (train with `ancify train`) |
 | `num_cpus` | Parallel workers (default: 4) |
 | `evaluation` | Optional block for Phase 3 (reference + VCF comparison) |
 
@@ -142,9 +237,10 @@ ancify project  -c CONFIG [-n N]    # Phase 1: project alignments
 ancify call     -c CONFIG [-n N]    # Phase 2: call ancestral states
 ancify evaluate -c CONFIG [-n N]    # Phase 3: evaluate (optional)
 ancify run      -c CONFIG [-n N]    # all phases end-to-end
+ancify train    -c CONFIG [-o MODEL] [-n N]   # train ML model (for method: ml)
 ```
 
-Also works as: `python -m ancify run -c config.yaml`
+Also: `python -m ancify run -c config.yaml`
 
 ---
 
@@ -225,6 +321,23 @@ tree: "(((bonobo,chimp),gorilla),macaque)"
 ```
 
 The tree topology determines how species are weighted, resolving cases that the voting method marks as unresolved. See the [algorithm docs](https://ancify.readthedocs.io/en/latest/algorithm.html) for a detailed walkthrough.
+
+### Method 3: Likelihood (Felsenstein pruning)
+
+With a **tree that has branch lengths**, you can use substitution-model-based reconstruction. ancify implements **Felsenstein’s pruning algorithm** and four models: **JC69**, **K80**, **HKY85**, and **GTR**. The root posterior probabilities are computed from the leaf data and branch lengths; confidence is encoded by thresholding the maximum posterior (e.g. ≥0.8 → uppercase, ≥0.5 → lowercase, &lt;0.5 → `n`).
+
+```yaml
+method: likelihood
+tree: "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)"
+substitution_model: HKY85
+model_kappa: 2.0
+```
+
+Requires **SciPy** (included in the default install). See the [algorithm](https://ancify.readthedocs.io/en/latest/algorithm.html) and [configuration](https://ancify.readthedocs.io/en/latest/configuration.html) docs.
+
+### Method 4: ML classifier
+
+Train a LightGBM classifier on your data (or a reference), then use it for calling: `ancify train -c config.yaml -o model.lgb`, then set `method: ml` and `ml_model_path: model.lgb`. See the docs for feature description and calibration.
 
 ### Input: Net AXT Alignments
 
@@ -337,13 +450,6 @@ The BCGM method (bonobo + chimp + gorilla + macaque) was validated against the E
 ## Documentation
 
 - **Online docs:** [ancify.readthedocs.io](https://ancify.readthedocs.io)
-- **Manual (PDF):** [docs/manual.pdf](https://github.com/kevinkorfmann/ancify/raw/main/docs/manual.pdf) — comprehensive LaTeX manual with algorithm descriptions, flowcharts, and worked examples.
-
-To rebuild the PDF from source:
-
-```bash
-cd docs && pdflatex manual.tex && pdflatex manual.tex
-```
 
 ---
 
@@ -355,11 +461,10 @@ ancify/
 ├── example_configs/
 │   ├── hg38_bcgm.yaml         # human (worked example)
 │   ├── mouse_example.yaml     # mouse (hypothetical)
-│   ├── drosophila_example.yaml # fruit fly (hypothetical)
-│   └── brassica_rapa_example.yaml # Brassica rapa plant (hypothetical)
+│   ├── drosophila_example.yaml
+│   └── brassica_rapa_example.yaml
 ├── docs/
-│   ├── manual.tex              # comprehensive LaTeX manual
-│   └── manual.pdf              # pre-compiled PDF
+├── tests/
 └── ancify/                     # Python package
     ├── __init__.py
     ├── __main__.py
@@ -367,8 +472,11 @@ ancify/
     ├── config.py               # YAML config loading
     ├── utils.py                # FASTA I/O, majority vote
     ├── project.py              # Phase 1: coordinate projection
-    ├── ancestral.py            # Phase 2: ancestral calling
+    ├── ancestral.py            # Phase 2: ancestral calling (dispatches by method)
     ├── parsimony.py            # Fitch algorithm & Newick parser
+    ├── likelihood.py           # Felsenstein pruning, JC69/K80/HKY85/GTR
+    ├── ml.py                   # LightGBM training & prediction
+    ├── backend.py              # CPU/GPU vectorized voting
     └── evaluate.py             # Phase 3: evaluation
 ```
 

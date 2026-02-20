@@ -3,6 +3,7 @@
 import pytest
 
 from ancify.ancestral import call_ancestral_base, call_ancestral_base_parsimony
+from ancify.likelihood import JC69, call_ancestral_base_likelihood
 from ancify.parsimony import parse_newick
 
 
@@ -183,6 +184,62 @@ class TestCallAncestralBaseParsimony:
     def test_lowercase_input_handled(self):
         bases = {"bonobo": "c", "chimp": "c", "gorilla": "c", "macaque": "c"}
         result = call_ancestral_base_parsimony(self.TREE, bases)
+        assert result == "C"
+
+
+class TestCallAncestralBaseLikelihood:
+    """Test the likelihood-based ancestral calling function."""
+
+    TREE = parse_newick(
+        "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038);"
+    )
+    MODEL = JC69()
+
+    def test_all_agree_uppercase(self):
+        bases = {"bonobo": "A", "chimp": "A", "gorilla": "A", "macaque": "A"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+        assert result == "A"
+        assert result.isupper()
+
+    def test_all_missing_returns_N(self):
+        bases = {"bonobo": "N", "chimp": "N", "gorilla": "N", "macaque": "N"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+        assert result == "N"
+
+    def test_some_missing_still_resolves(self):
+        bases = {"bonobo": "T", "chimp": "T", "gorilla": "N", "macaque": "T"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+        assert result.upper() == "T"
+
+    def test_simple_two_taxa(self):
+        tree = parse_newick("(X:0.1,Y:0.1);")
+        bases = {"X": "C", "Y": "C"}
+        result = call_ancestral_base_likelihood(tree, bases, self.MODEL)
+        assert result == "C"
+
+    def test_returns_single_char(self):
+        bases = {"bonobo": "G", "chimp": "G", "gorilla": "G", "macaque": "G"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+        assert len(result) == 1
+
+    def test_result_is_valid_or_N(self):
+        cases = [
+            {"bonobo": "A", "chimp": "A", "gorilla": "A", "macaque": "A"},
+            {"bonobo": "N", "chimp": "N", "gorilla": "N", "macaque": "N"},
+            {"bonobo": "A", "chimp": "G", "gorilla": "T", "macaque": "C"},
+        ]
+        for bases in cases:
+            result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+            assert result.upper() in ("A", "C", "G", "T", "N")
+
+    def test_missing_species_treated_as_N(self):
+        bases = {"bonobo": "A", "chimp": "A"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
+        assert result.upper() in "ACGT"
+
+    def test_lowercase_input_handled(self):
+        bases = {"bonobo": "c", "chimp": "c", "gorilla": "c", "macaque": "c"}
+        result = call_ancestral_base_likelihood(self.TREE, bases, self.MODEL)
         assert result == "C"
 
 

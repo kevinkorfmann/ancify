@@ -53,6 +53,14 @@ method: voting
 # tree: "(((bonobo,chimp),gorilla),macaque)"   # inline Newick, or:
 # tree: species_tree.nwk                        # path to .nwk file
 
+# --- Likelihood options (only needed when method: likelihood) ---
+# substitution_model: HKY85         # JC69 (default), K80, HKY85, or GTR
+# model_kappa: 2.0                  # transition/transversion ratio (K80, HKY85)
+# model_base_freqs: [0.3, 0.2, 0.2, 0.3]  # equilibrium freqs (HKY85, GTR)
+# model_rates: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # exchangeability rates (GTR)
+# likelihood_high_threshold: 0.8    # min posterior → uppercase (high conf)
+# likelihood_low_threshold: 0.5     # min posterior → lowercase (low conf)
+
 # --- ML options (only needed when method: ml) ---
 # ml_model_path: model.lgb          # path to trained LightGBM model
 # ml_training_reference: ./ensembl_ancestor/  # optional: supervised labels
@@ -106,8 +114,14 @@ Each outgroup entry requires:
 | `num_cpus` | `4` | Number of parallel worker processes |
 | `backend` | `auto` | Compute backend: `"auto"`, `"cpu"`, or `"gpu"` (see {doc}`performance`) |
 | `gpu_devices` | all available | List of GPU device IDs to use, e.g. `[0, 1, 2]` |
-| `method` | `voting` | Ancestral inference method: `"voting"`, `"parsimony"`, or `"ml"` (see {doc}`algorithm`) |
-| `tree` | none | Newick tree of outgroup species (required when `method: parsimony`). Inline string or path to `.nwk` file. |
+| `method` | `voting` | Ancestral inference method: `"voting"`, `"parsimony"`, `"likelihood"`, or `"ml"` (see {doc}`algorithm`) |
+| `tree` | none | Newick tree of outgroup species (required when `method: parsimony` or `likelihood`). Inline string or path to `.nwk` file. |
+| `substitution_model` | `JC69` | Substitution model for likelihood method: `"JC69"`, `"K80"`, `"HKY85"`, or `"GTR"`. |
+| `model_kappa` | `2.0` | Transition/transversion ratio κ (used by K80 and HKY85). |
+| `model_base_freqs` | uniform | Equilibrium base frequencies `[π_A, π_C, π_G, π_T]` (used by HKY85 and GTR). Must sum to 1. |
+| `model_rates` | none | Six GTR exchangeability rates `[AC, AG, AT, CG, CT, GT]` (required when `substitution_model: GTR`). |
+| `likelihood_high_threshold` | `0.8` | Minimum posterior probability for high (uppercase) confidence (likelihood method). |
+| `likelihood_low_threshold` | `0.5` | Minimum posterior probability for low (lowercase) confidence (likelihood method). Below this → `n`. |
 | `ml_model_path` | none | Path to a trained LightGBM model file (required when `method: ml`). Produced by `ancify train`. |
 | `ml_training_reference` | none | Directory of reference ancestral FASTAs for supervised training (optional; used by `ancify train`). |
 | `ml_high_threshold` | `0.8` | Minimum predicted probability for high (uppercase) confidence. |
@@ -162,7 +176,7 @@ If you are running on a machine with limited memory, reduce `num_cpus`. For Phas
 
 ### `method`: choosing your inference approach
 
-ancify supports three methods for inferring the ancestral allele at each position.
+ancify supports four methods for inferring the ancestral allele at each position.
 You switch between them with a single line in your YAML:
 
 ```yaml
@@ -180,6 +194,10 @@ method: voting      # default
   │              │ Resolves many "unresolved" (n) sites that voting misses.   │
   │              │ Requires: tree field.                                      │
   ├──────────────┼────────────────────────────────────────────────────────────┤
+  │ likelihood   │ Felsenstein (1981) pruning with an explicit substitution   │
+  │              │ model. Computes posterior probabilities at the root using   │
+  │              │ branch lengths. Requires: tree with branch lengths, scipy. │
+  ├──────────────┼────────────────────────────────────────────────────────────┤
   │ ml           │ LightGBM gradient-boosted classifier. Learns substitution  │
   │              │ biases (CpG, GC context, etc.) from data. Yields calibrated│
   │              │ probability scores rather than binary high/low.            │
@@ -189,9 +207,11 @@ method: voting      # default
 
 **Not sure which to use?** Start with `voting`. It requires no extra configuration
 and gives >99.9% accuracy for most species. Switch to `parsimony` if you have a
-reliable tree and want to resolve more "unresolved" sites. Use `ml` if you have
-an external reference sequence for training labels and want calibrated confidence
-scores. See {doc}`algorithm` for a detailed comparison with worked examples.
+reliable tree and want to resolve more "unresolved" sites. Use `likelihood` if you
+have a tree with branch lengths and want calibrated posterior probabilities from
+an explicit substitution model. Use `ml` if you have an external reference sequence
+for training labels and want to learn context-dependent patterns.
+See {doc}`algorithm` for a detailed comparison with worked examples.
 
 #### Parsimony YAML
 
@@ -205,6 +225,34 @@ outgroup entries. You can also point to a file:
 
 ```yaml
 tree: species_tree.nwk
+```
+
+#### Likelihood YAML
+
+```yaml
+method: likelihood
+tree: "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)"
+
+# Substitution model (default: JC69)
+substitution_model: HKY85
+model_kappa: 2.0
+model_base_freqs: [0.3, 0.2, 0.2, 0.3]
+
+# Optional: tune confidence thresholds (defaults shown)
+likelihood_high_threshold: 0.8   # posterior ≥ 0.8 → UPPERCASE (high conf)
+likelihood_low_threshold: 0.5    # posterior ≥ 0.5 → lowercase (low conf)
+                                 # below 0.5 → n (unresolved)
+```
+
+Branch lengths are required — they control how much influence each leaf has.
+Trees from RAxML, IQ-TREE, or similar tools provide lengths in substitutions
+per site, which is exactly what the models expect. For GTR, also supply six
+exchangeability rates:
+
+```yaml
+substitution_model: GTR
+model_rates: [1.0, 2.0, 1.0, 1.0, 2.0, 1.0]   # [AC, AG, AT, CG, CT, GT]
+model_base_freqs: [0.3, 0.2, 0.2, 0.3]
 ```
 
 #### ML YAML (two-step workflow)
@@ -359,10 +407,13 @@ grep -v "^#" assembly_report.txt | awk -F'\t' '{print $1, $9}' > chromoLens.txt
 
 When a config is loaded, ancify validates:
 
-- At least one inner outgroup species is specified.
-- At least one outer outgroup species is specified.
+- At least one inner outgroup species is specified (voting, ml).
+- At least one outer outgroup species is specified (voting, ml).
+- At least one outgroup species is specified (parsimony, likelihood).
 - The chromosome lengths file exists and is readable.
 - All alignment files exist and are accessible.
+- If `method` is `parsimony` or `likelihood`: a `tree` field is present and leaf names match outgroup names.
+- If `method` is `likelihood`: the substitution model name is valid, GTR has 6 rates, base frequencies (if provided) have 4 entries summing to ~1, and thresholds satisfy 0 ≤ low ≤ high ≤ 1.
 
 If any check fails, a clear error message is printed before any processing begins. This prevents wasting hours on Phase 1 only to discover a typo in a file path.
 
@@ -450,6 +501,36 @@ You can also point `tree` to an external file:
 ```yaml
 tree: species_tree.nwk
 ```
+
+### Likelihood
+
+The same outgroup configuration with the likelihood method and an HKY85 substitution model:
+
+```yaml
+focal_species: human
+chromosome_lengths: chromoLens.txt
+outgroups:
+  inner:
+    - name: bonobo
+      alignment: hg38.panPan3.net.axt.gz
+    - name: chimp
+      alignment: hg38.panTro6.net.axt.gz
+    - name: gorilla
+      alignment: hg38.gorGor6.net.axt.gz
+  outer:
+    - name: macaque
+      alignment: hg38.rheMac10.net.axt.gz
+method: likelihood
+tree: "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)"
+substitution_model: HKY85
+model_kappa: 2.0
+model_base_freqs: [0.3, 0.2, 0.2, 0.3]
+output_dir: ./human_ancestral_likelihood
+```
+
+When `method` is `likelihood`, branch lengths in the tree are critical — they determine
+how much weight each leaf's observation receives. The inner/outer distinction is ignored;
+all outgroups are placed on the tree.
 
 ### ML classifier
 

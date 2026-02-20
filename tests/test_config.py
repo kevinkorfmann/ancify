@@ -137,3 +137,70 @@ class TestValidateConfig:
         )
         with pytest.raises(ValueError, match="Alignment file not found"):
             validate_config(cfg)
+
+
+class TestValidateLikelihood:
+    """Validation for method='likelihood'."""
+
+    def _make_cfg(self, tmp_path, **overrides):
+        lengths = tmp_path / "chromoLens.txt"
+        lengths.write_text("chr1\t100\n")
+        axt = tmp_path / "sp.axt"
+        axt.write_text("")
+        defaults = dict(
+            focal_species="test",
+            chromosome_lengths=str(lengths),
+            outgroups_inner=[OutgroupSpec("A", str(axt))],
+            outgroups_outer=[OutgroupSpec("B", str(axt))],
+            method="likelihood",
+            tree="(A:0.1,B:0.1)",
+        )
+        defaults.update(overrides)
+        return PipelineConfig(**defaults)
+
+    def test_valid_likelihood_config(self, tmp_path):
+        cfg = self._make_cfg(tmp_path)
+        validate_config(cfg)
+
+    def test_requires_tree(self, tmp_path):
+        cfg = self._make_cfg(tmp_path, tree=None)
+        with pytest.raises(ValueError, match="tree"):
+            validate_config(cfg)
+
+    def test_unknown_model_rejected(self, tmp_path):
+        cfg = self._make_cfg(tmp_path, substitution_model="FAKE")
+        with pytest.raises(ValueError, match="Unknown substitution_model"):
+            validate_config(cfg)
+
+    def test_gtr_requires_six_rates(self, tmp_path):
+        cfg = self._make_cfg(
+            tmp_path, substitution_model="GTR", model_rates=[1.0, 2.0],
+        )
+        with pytest.raises(ValueError, match="6 exchangeability rates"):
+            validate_config(cfg)
+
+    def test_gtr_requires_rates(self, tmp_path):
+        cfg = self._make_cfg(
+            tmp_path, substitution_model="GTR", model_rates=None,
+        )
+        with pytest.raises(ValueError, match="6 exchangeability rates"):
+            validate_config(cfg)
+
+    def test_base_freqs_must_have_four_entries(self, tmp_path):
+        cfg = self._make_cfg(tmp_path, model_base_freqs=[0.5, 0.5])
+        with pytest.raises(ValueError, match="4 values"):
+            validate_config(cfg)
+
+    def test_base_freqs_must_sum_to_one(self, tmp_path):
+        cfg = self._make_cfg(tmp_path, model_base_freqs=[0.5, 0.5, 0.5, 0.5])
+        with pytest.raises(ValueError, match="sum to"):
+            validate_config(cfg)
+
+    def test_invalid_thresholds(self, tmp_path):
+        cfg = self._make_cfg(
+            tmp_path,
+            likelihood_high_threshold=0.3,
+            likelihood_low_threshold=0.7,
+        )
+        with pytest.raises(ValueError, match="thresholds"):
+            validate_config(cfg)

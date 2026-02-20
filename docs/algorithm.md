@@ -443,6 +443,155 @@ The `tree` field accepts either an inline Newick string or a path to a `.nwk` fi
 
 ---
 
+## Alternative method: Likelihood (Felsenstein pruning)
+
+Since version 1.4.0 ancify supports a fourth inference method: **likelihood-based ancestral reconstruction** using Felsenstein's pruning algorithm (Felsenstein, 1981). Instead of counting alleles (voting) or minimising mutations (parsimony), this method uses an explicit **substitution model** and **branch lengths** to compute the posterior probability of each ancestral base at the root of the phylogenetic tree.
+
+### When to prefer likelihood
+
+- You have a **phylogenetic tree with branch lengths** (in expected substitutions per site).
+- You want **posterior probabilities** rather than the binary confident/ambiguous split of parsimony.
+- You want the reconstruction to account for the fact that long branches accumulate more substitutions than short branches.
+- You want to use a specific substitution model that reflects known biology (e.g. transition/transversion bias via K80 or HKY85).
+
+### Substitution models
+
+All models define a 4×4 instantaneous rate matrix Q, normalised so that one unit of branch length corresponds to one expected substitution:
+
+```text
+  ┌───────────┬────────────────────────────────────────────────────────────────┐
+  │ Model     │ Description                                                    │
+  ├───────────┼────────────────────────────────────────────────────────────────┤
+  │ JC69      │ Jukes–Cantor (1969). All substitutions equally likely.         │
+  │           │ No free parameters.                                            │
+  ├───────────┼────────────────────────────────────────────────────────────────┤
+  │ K80       │ Kimura (1980) two-parameter model. Distinguishes transitions   │
+  │           │ (A↔G, C↔T) from transversions. One parameter: kappa (κ).       │
+  ├───────────┼────────────────────────────────────────────────────────────────┤
+  │ HKY85     │ Hasegawa–Kishino–Yano (1985). Like K80 but with non-uniform   │
+  │           │ equilibrium base frequencies. Parameters: κ + π = [A, C, G, T].│
+  ├───────────┼────────────────────────────────────────────────────────────────┤
+  │ GTR       │ General time-reversible. Six exchangeability rates + base       │
+  │           │ frequencies. The most flexible reversible model.               │
+  └───────────┴────────────────────────────────────────────────────────────────┘
+```
+
+The transition probability matrix P(t) = expm(Q·t) gives the probability of observing base *j* at the end of a branch of length *t*, given base *i* at the start.
+
+### The Felsenstein pruning algorithm
+
+At every genomic position the algorithm performs a single bottom-up pass over the tree:
+
+**Step 1: Initialise leaves**
+
+Each leaf gets a conditional likelihood vector of length 4. If the observed base is (say) A, the vector is `[1, 0, 0, 0]`. If the leaf is missing (`N`), the vector is `[1, 1, 1, 1]` (compatible with any base).
+
+**Step 2: Bottom-up (post-order traversal)**
+
+At each internal node with children c₁, c₂, …, compute:
+
+```text
+  L(node, i) = ∏_c [ Σ_j P_c(i,j) · L(c, j) ]
+```
+
+where P_c is the transition matrix for the branch leading to child c. This multiplies together each child's contribution: the sum over all possible child states *j* of the probability of transitioning from parent state *i* to *j*, weighted by the child's likelihood of state *j*.
+
+**Step 3: Root posterior**
+
+Multiply the root's conditional likelihoods by the prior (equilibrium base frequencies π) and normalise:
+
+```text
+  posterior(i) = π_i · L(root, i) / Σ_j π_j · L(root, j)
+```
+
+**Step 4: Call the ancestral base**
+
+The base with the highest posterior probability is selected. Confidence encoding:
+
+```text
+  ┌────────────────────────────────────────┬──────────────┬───────────────────┐
+  │ Condition                              │ Output       │ Interpretation    │
+  ├────────────────────────────────────────┼──────────────┼───────────────────┤
+  │ max posterior ≥ high_threshold (0.8)   │ ACGT (upper) │ High confidence   │
+  │ max posterior ≥ low_threshold  (0.5)   │ acgt (lower) │ Low confidence    │
+  │ max posterior <  low_threshold         │ n            │ Unresolved        │
+  │ All leaves missing                     │ N            │ No data           │
+  └────────────────────────────────────────┴──────────────┴───────────────────┘
+```
+
+### Worked example
+
+```text
+  Tree: (((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)
+  Model: JC69
+  Observed: bonobo=G, chimp=G, gorilla=A, macaque=A
+
+  Step 1: Leaf likelihoods
+    bonobo  → [0, 0, 1, 0]  (G)
+    chimp   → [0, 0, 1, 0]  (G)
+    gorilla → [1, 0, 0, 0]  (A)
+    macaque → [1, 0, 0, 0]  (A)
+
+  Step 2: Bottom-up
+    At (bonobo,chimp) node, branch lengths 0.008:
+      P(0.008) ≈ diag(0.9894) + off-diag(0.0035)
+      Both children are G → parent L is dominated by G but with some
+      probability of A, C, T through the short branches.
+
+    At ((bc),gorilla) node:
+      Left child favours G, right child (gorilla) favours A.
+      The branch to gorilla (0.009) is short → A signal is strong.
+      Combined: both A and G have substantial likelihood.
+
+    At root:
+      Left child favours A/G mix, right child (macaque, branch 0.038) favours A.
+      A has the highest likelihood.
+
+  Step 3: Posterior
+    π = [0.25, 0.25, 0.25, 0.25]  (JC69 has uniform frequencies)
+    posterior(A) ≈ 0.84, posterior(G) ≈ 0.15, others ≈ 0.005
+
+  Step 4: max posterior = 0.84 ≥ 0.8 → "A" (high confidence)
+```
+
+Compare this to the parsimony result (also A) and the voting result (n, unresolved). Likelihood agrees with parsimony here, but additionally provides a calibrated probability (84%) that quantifies how confident we should be.
+
+### Comparison: voting vs. parsimony vs. likelihood vs. ML
+
+```text
+  Position with: bonobo=G, chimp=G, gorilla=A, macaque=A
+
+  Two-tier voting:
+    Inner consensus = G, Outer consensus = A → DISAGREEMENT → "n"
+
+  Fitch parsimony:
+    Root = A (one mutation: A→G on bonobo-chimp branch) → "A"
+
+  Likelihood (JC69):
+    Root posterior: A ≈ 0.84 → "A" (high confidence, with probability)
+
+  ML classifier:
+    Sees outgroup bases + local context → may also predict A with calibrated p
+```
+
+### Configuration
+
+```yaml
+method: likelihood
+tree: "(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)"
+substitution_model: HKY85
+model_kappa: 2.0
+model_base_freqs: [0.3, 0.2, 0.2, 0.3]
+likelihood_high_threshold: 0.8
+likelihood_low_threshold: 0.5
+```
+
+Branch lengths in the Newick tree are critical for likelihood — they determine how much weight each leaf's observation carries. Trees estimated by phylogenetic methods (e.g. RAxML, IQ-TREE) typically provide branch lengths in substitutions per site, which is exactly what the models expect.
+
+See {doc}`configuration` for the complete parameter reference.
+
+---
+
 ## Alternative method: Machine learning classifier
 
 Since version 2.0.0 ancify supports a third inference method: a **LightGBM gradient-boosted classifier** that learns substitution patterns from data rather than relying on hand-crafted rules.
@@ -573,6 +722,23 @@ The ML method can resolve cases like this by learning that the G→A pattern at 
   5. Write to output FASTA
 ```
 
+### Likelihood (Felsenstein pruning)
+
+```text
+  For each position in the focal genome:
+
+  1. Gather projected bases from all outgroup species
+  2. Run Felsenstein bottom-up pass on the tree with branch lengths
+     using the chosen substitution model (JC69/K80/HKY85/GTR)
+  3. Compute root posterior: π · L(root) / Σ
+  4. Encode confidence:
+       max posterior >= high_threshold → UPPERCASE (high confidence)
+       max posterior >= low_threshold  → lowercase (low confidence)
+       max posterior <  low_threshold  → n (unresolved)
+       all missing                    → N
+  5. Write to output FASTA
+```
+
 ### ML classifier
 
 ```text
@@ -592,4 +758,4 @@ The ML method can resolve cases like this by learning that the G→A pattern at 
   5. Write to output FASTA
 ```
 
-All three methods are fast (Phase 2 takes minutes for a full genome) and produce reliable ancestral calls with built-in confidence assessment. Voting is the simplest and best-tested; parsimony is more principled for complex outgroup configurations; ML can learn substitution biases and local context when training data is available.
+All four methods are fast (Phase 2 takes minutes for a full genome) and produce reliable ancestral calls with built-in confidence assessment. Voting is the simplest and best-tested; parsimony is more principled for complex outgroup configurations; likelihood adds calibrated posterior probabilities using substitution models; ML can learn substitution biases and local context when training data is available.

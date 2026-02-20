@@ -69,13 +69,24 @@ EXAMPLE_CONFIG = textwrap.dedent("""\
     # ── Ancestral inference method ────────────────────────────────────
     # "voting" (default): two-tier inner/outer outgroup voting.
     # "parsimony": Fitch parsimony on a phylogenetic tree.
+    # "likelihood": Felsenstein pruning with a substitution model.
     #
     # method: parsimony
     #
-    # Newick tree topology (required when method is "parsimony").
+    # Newick tree topology (required when method is "parsimony" or "likelihood").
     # Can be an inline Newick string or a path to a .nwk file.
     # Leaf names must match outgroup 'name' fields.
-    # tree: "(((close_species_1,close_species_2),distant_species),outgroup2)"
+    # tree: "(((close_species_1:0.008,close_species_2:0.008):0.002,distant_species:0.009):0.020,outgroup2:0.038)"
+
+    # ── Likelihood options (only when method: likelihood) ─────────────
+    # method: likelihood
+    # tree: "(((close_species_1:0.008,close_species_2:0.008):0.002,distant_species:0.009):0.020,outgroup2:0.038)"
+    # substitution_model: HKY85       # JC69 (default), K80, HKY85, or GTR
+    # model_kappa: 2.0                # transition/transversion ratio (K80, HKY85)
+    # model_base_freqs: [0.3, 0.2, 0.2, 0.3]   # equilibrium freqs (HKY85, GTR)
+    # model_rates: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # exchangeability rates (GTR only)
+    # likelihood_high_threshold: 0.8  # posterior >= this → uppercase (high conf)
+    # likelihood_low_threshold: 0.5   # posterior >= this → lowercase (low conf)
 
     # Optional evaluation block.  Both sub-sections are independent;
     # include either, both, or neither.
