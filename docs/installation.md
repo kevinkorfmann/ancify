@@ -29,6 +29,18 @@ pip install '.[dev]'
 pytest
 ```
 
+### With ML dependencies
+
+The ML inference method (`method: ml`) requires LightGBM and scikit-learn:
+
+```bash
+pip install 'ancify[ml]'
+```
+
+This installs `lightgbm` and `scikit-learn`. Once installed you can train a
+classifier and call ancestral alleles with it — see {doc}`configuration` for
+the full workflow and {doc}`algorithm` for how the model works.
+
 ### With GPU acceleration
 
 For large genomes, GPU acceleration can reduce runtime from hours to minutes.
@@ -51,6 +63,8 @@ configuration.
 pip install '.[all]'
 ```
 
+This installs all optional dependencies: evaluation tools, fast gzip, and the ML method. PyTorch must still be installed separately (see "With GPU acceleration" above) because the correct build depends on your CUDA version.
+
 ### Using uv (faster alternative to pip)
 
 [uv](https://github.com/astral-sh/uv) is a fast Python package installer:
@@ -68,11 +82,13 @@ uv pip install '.[all]'
 | Python | >= 3.8 | Yes | Runtime |
 | PyYAML | >= 5.0 | Yes | YAML config parsing |
 | NumPy | >= 1.20 | Yes | Array operations in projection and calling |
-| PyTorch | >= 2.0 | No | GPU-accelerated ancestral calling ({doc}`performance`) |
-| isal | >= 1.0 | No | 2–5× faster gzip decompression for Phase 1 |
-| scikit-allel | >= 1.3 | No | VCF reading (Phase 3 evaluation) |
-| matplotlib | >= 3.0 | No | Plotting (Phase 3 evaluation) |
-| pytest | >= 7.0 | No | Running the test suite |
+| PyTorch | >= 2.0 | No | GPU-accelerated ancestral calling — `pip install 'ancify[fast]'` + PyTorch (see {doc}`performance`) |
+| isal | >= 1.0 | No | 2–5× faster gzip decompression for Phase 1 — `pip install 'ancify[fast]'` |
+| lightgbm | >= 4.0 | No | ML-based ancestral calling (`method: ml`) — `pip install 'ancify[ml]'` |
+| scikit-learn | >= 1.0 | No | Feature scaling and model utilities for ML method — `pip install 'ancify[ml]'` |
+| scikit-allel | >= 1.3 | No | VCF reading (Phase 3 evaluation) — `pip install 'ancify[evaluate]'` |
+| matplotlib | >= 3.0 | No | Plotting (Phase 3 evaluation) — `pip install 'ancify[evaluate]'` |
+| pytest | >= 7.0 | No | Running the test suite — `pip install 'ancify[dev]'` |
 
 ## Verify the installation
 
@@ -155,6 +171,14 @@ The `ancify` script was not installed on your PATH. Common fixes:
 1. **Check your PATH:** `pip show ancify` will show the installation location.
 2. **Use the module form:** `python -m ancify` always works if the package is installed.
 3. **Virtual environment:** Make sure your virtual environment is activated.
+
+### `ModuleNotFoundError: No module named 'lightgbm'`
+
+You are trying to use `method: ml` without the ML extras:
+
+```bash
+pip install 'ancify[ml]'
+```
 
 ### `SyntaxError` on older Python
 

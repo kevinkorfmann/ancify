@@ -46,12 +46,25 @@ min_outer_freq: 1
 
 num_cpus: 24
 
+# Inference method: "voting" (default), "parsimony", or "ml".
+method: voting
+
+# --- Parsimony options (only needed when method: parsimony) ---
+# tree: "(((bonobo,chimp),gorilla),macaque)"   # inline Newick, or:
+# tree: species_tree.nwk                        # path to .nwk file
+
+# --- ML options (only needed when method: ml) ---
+# ml_model_path: model.lgb          # path to trained LightGBM model
+# ml_training_reference: ./ensembl_ancestor/  # optional: supervised labels
+# ml_high_threshold: 0.8            # min probability → uppercase (high conf)
+# ml_low_threshold: 0.5             # min probability → lowercase (low conf)
+
 # Performance backend: "auto", "cpu", or "gpu".
 # "auto" uses GPU when PyTorch + CUDA is available, otherwise CPU.
 backend: auto
 
 # Optional: restrict to specific GPUs (default: use all).
-gpu_devices: [0, 1, 2]
+# Example: gpu_devices: [0, 1, 2]
 
 # Optional evaluation block (Phase 3).
 evaluation:
@@ -147,6 +160,88 @@ Each chromosome is processed independently. `num_cpus` controls how many chromos
 
 If you are running on a machine with limited memory, reduce `num_cpus`. For Phase 1 (projection), memory is modest; the bottleneck is Phase 2 (calling), which loads all projected sequences for each active chromosome.
 
+### `method`: choosing your inference approach
+
+ancify supports three methods for inferring the ancestral allele at each position.
+You switch between them with a single line in your YAML:
+
+```yaml
+method: voting      # default
+```
+
+```text
+  ┌──────────────┬────────────────────────────────────────────────────────────┐
+  │ method       │ Description                                                │
+  ├──────────────┼────────────────────────────────────────────────────────────┤
+  │ voting       │ Two-tier majority vote. Inner outgroups vote first; outer  │
+  │ (default)    │ provides independent check. Fast, no extra deps.           │
+  ├──────────────┼────────────────────────────────────────────────────────────┤
+  │ parsimony    │ Fitch (1971) algorithm on a Newick phylogenetic tree.      │
+  │              │ Resolves many "unresolved" (n) sites that voting misses.   │
+  │              │ Requires: tree field.                                      │
+  ├──────────────┼────────────────────────────────────────────────────────────┤
+  │ ml           │ LightGBM gradient-boosted classifier. Learns substitution  │
+  │              │ biases (CpG, GC context, etc.) from data. Yields calibrated│
+  │              │ probability scores rather than binary high/low.            │
+  │              │ Requires: pip install 'ancify[ml]', a trained model.       │
+  └──────────────┴────────────────────────────────────────────────────────────┘
+```
+
+**Not sure which to use?** Start with `voting`. It requires no extra configuration
+and gives >99.9% accuracy for most species. Switch to `parsimony` if you have a
+reliable tree and want to resolve more "unresolved" sites. Use `ml` if you have
+an external reference sequence for training labels and want calibrated confidence
+scores. See {doc}`algorithm` for a detailed comparison with worked examples.
+
+#### Parsimony YAML
+
+```yaml
+method: parsimony
+tree: "(((bonobo,chimp),gorilla),macaque)"
+```
+
+Leaf names in the Newick string must exactly match the `name` fields of your
+outgroup entries. You can also point to a file:
+
+```yaml
+tree: species_tree.nwk
+```
+
+#### ML YAML (two-step workflow)
+
+**Step 1: Train the model** (run once, before calling):
+
+```yaml
+# Add to config.yaml — optionally point to a reference for supervised labels:
+ml_training_reference: /data/ensembl_ancestor/   # omit for self-supervised
+```
+
+```bash
+ancify train -c config.yaml -o model.lgb
+```
+
+**Step 2: Call with the trained model**:
+
+```yaml
+method: ml
+ml_model_path: model.lgb
+
+# Optional: tune confidence thresholds (defaults shown)
+ml_high_threshold: 0.8   # predicted probability ≥ 0.8 → UPPERCASE (high conf)
+ml_low_threshold: 0.5    # predicted probability ≥ 0.5 → lowercase (low conf)
+                         # below 0.5 → n (unresolved)
+```
+
+```bash
+ancify call -c config.yaml
+```
+
+Install ML dependencies first if you haven't:
+
+```bash
+pip install 'ancify[ml]'
+```
+
 ### `backend`: the compute engine
 
 This field selects which execution backend ancify uses for the heavy computation
@@ -161,13 +256,33 @@ in Phases 1 and 2. See {doc}`performance` for the full details.
   vectorized CPU.             the unvectorized path.
 ```
 
-When `backend: "gpu"` is active, you can further restrict which GPUs are used
-with `gpu_devices`:
+When `backend: "gpu"` (or `"auto"` with CUDA detected) is active, chromosomes
+are distributed round-robin across all available GPUs. Use `gpu_devices` to
+restrict which ones are used:
 
 ```yaml
+# Use all available GPUs (default)
+backend: auto
+
+# Use specific GPUs only
+backend: auto
+gpu_devices: [0, 1, 2]   # three A100s
+
+# Single GPU, explicit
 backend: gpu
-gpu_devices: [0, 2]    # use only GPU 0 and GPU 2
+gpu_devices: [0]
+
+# Force CPU-only even if a GPU is present
+backend: cpu
 ```
+
+Install PyTorch with CUDA to unlock the GPU path:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+See {doc}`performance` for supported hardware, memory budgets, and benchmarks.
 
 ### Choosing chromosomes
 

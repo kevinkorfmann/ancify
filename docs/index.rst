@@ -5,9 +5,9 @@ ancify
 
 ancify is a config-driven Python pipeline that determines the ancestral state
 at every position in a reference genome by comparing pairwise alignments from
-multiple outgroup species. It supports two inference methods: **two-tier voting**
-and **Fitch parsimony** on a phylogenetic tree, both with case-encoded confidence
-levels.
+multiple outgroup species. It supports three inference methods: **two-tier voting**,
+**Fitch parsimony** on a phylogenetic tree, and a **machine-learning classifier**
+(LightGBM) — all producing case-encoded confidence levels.
 
 .. code-block:: text
 
@@ -28,6 +28,14 @@ levels.
                       Disagree? → n (unresolved)
                     Both empty? → N (missing)
 
+Three methods, one config field:
+
+.. code-block:: yaml
+
+   method: voting      # default — two-tier majority vote (above diagram)
+   method: parsimony   # Fitch algorithm on a Newick phylogenetic tree
+   method: ml          # LightGBM classifier trained on your alignment data
+
 Get started in five minutes:
 
 .. code-block:: bash
@@ -41,6 +49,7 @@ Get started in five minutes:
 Why ancify?
 -----------
 
+- **Three inference methods** — choose the approach that fits your data: two-tier voting (fast, transparent), Fitch parsimony (tree-aware, resolves ILS), or ML classifier (learns substitution biases from your data). See :doc:`algorithm`.
 - **GPU-accelerated** — optional PyTorch backend turns 12-hour genome-wide runs into ~2 minutes on NVIDIA GPUs. See :doc:`performance`.
 - **Species-agnostic** — works with humans, mice, flies, fish, plants, or any species with outgroup alignments.
 - **Educational** — the docs teach you the population genetics *behind* polarization, not just the buttons to press.

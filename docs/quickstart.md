@@ -72,6 +72,28 @@ num_cpus: 24
 Not working with humans? See {doc}`species_guide` for ready-made configs for mouse, Drosophila, Brassica rapa, zebrafish, and guidance on setting up any other species.
 :::
 
+### Choosing an inference method
+
+The config above uses the default **two-tier voting** method. ancify supports two
+additional methods — just add one line to your YAML:
+
+```yaml
+# Two-tier majority vote (default — no extra config needed)
+method: voting
+
+# Fitch parsimony on a phylogenetic tree
+method: parsimony
+tree: "(((bonobo,chimp),gorilla),macaque)"
+
+# LightGBM ML classifier (requires ancify[ml] and a trained model)
+method: ml
+ml_model_path: model.lgb
+```
+
+Not sure which to pick? Start with `voting`. See {doc}`algorithm` for a
+side-by-side comparison, or jump to {doc}`configuration` for the full YAML
+reference including GPU and ML options.
+
 ## Step 4: Run the pipeline
 
 ```bash
@@ -186,7 +208,7 @@ Phase 3: EVALUATE (optional)
   and wrote per-chromosome evaluation statistics.
 ```
 
-For a deeper understanding of the algorithm, see {doc}`algorithm`. For the biology behind why this works, see {doc}`background`.
+For a deeper understanding of the algorithm — including the Fitch parsimony and ML methods — see {doc}`algorithm`. For the biology behind why this works, see {doc}`background`.
 
 ---
 
@@ -195,11 +217,11 @@ For a deeper understanding of the algorithm, see {doc}`algorithm`. For the biolo
 | I want to... | Go to... |
 |--------------|----------|
 | Speed up runs with GPU acceleration | {doc}`performance` |
+| Use the ML classifier or Fitch parsimony | {doc}`algorithm` |
+| See every YAML field including GPU and ML | {doc}`configuration` |
 | Understand the biology behind polarization | {doc}`background` |
 | Walk through a complete worked example | {doc}`tutorials` |
 | Configure ancify for a different species | {doc}`species_guide` |
-| Understand every config field | {doc}`configuration` |
-| Learn the algorithm in depth | {doc}`algorithm` |
 | Interpret evaluation results | {doc}`evaluation` |
 | Use ancify as a Python library | {doc}`api` |
 | Look up a term | {doc}`glossary` |
