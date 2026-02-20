@@ -10,3 +10,9 @@ build/
 .eggs/
 docs/_build/
 .pytest_cache/
+
+# Script test run directories
+ancify_test/
+ancify_test_chr22/
+ancify_test_full/
+ancify_compare/
