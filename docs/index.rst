@@ -1,9 +1,6 @@
 ancify — Fast ancestral allele polarization from outgroup alignments
 ================================================================
 
-
-**Ancestral allele polarization for any species.**
-
 ancify is a config-driven Python pipeline that determines the ancestral state
 at every position in a reference genome by comparing pairwise alignments from
 multiple outgroup species. It supports four inference methods: **two-tier voting**,
