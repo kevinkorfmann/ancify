@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.4.0 (2026)
+
+Likelihood-based ancestral reconstruction and expanded installation docs.
+
+### Likelihood method (Felsenstein pruning)
+
+- **New `method: likelihood`.** Infers ancestral alleles using Felsenstein's pruning algorithm on a user-supplied tree with branch lengths. Root posterior probabilities are computed under a continuous-time substitution model and mapped to the same case-encoded confidence scheme (uppercase / lowercase / `n` / `N`).
+- **Substitution models.** Four models are supported: **JC69**, **K80**, **HKY85**, and **GTR**. All use normalised rate matrices (one expected substitution per unit branch length). Transition probabilities use `scipy.linalg.expm` (JC69 has a closed-form shortcut).
+- **New `ancify.likelihood` module.** `SubstitutionModel` base class, `JC69`, `K80`, `HKY85`, `GTR` classes, `felsenstein_pruning()`, `call_ancestral_base_likelihood()`, `_call_chromosome_likelihood()` worker, and `build_model()` factory.
+- **New config fields:** `substitution_model`, `model_kappa`, `model_base_freqs`, `model_rates`, `likelihood_high_threshold`, `likelihood_low_threshold`. Validation requires a tree with leaf names matching outgroups; GTR requires six `model_rates`; base frequencies must sum to ~1.
+- **Core dependency:** added **SciPy** (>=1.7) for matrix exponentiation.
+
+### Documentation and README
+
+- **Algorithm docs.** New section on the likelihood method: substitution models, Felsenstein pruning steps, worked example, and comparison with voting/parsimony/ML. Summary section updated for all four methods.
+- **Configuration docs.** Field reference and method table updated for `likelihood`; new subsection "Likelihood YAML" with branch-length requirement and GTR example; validation and config recipes updated.
+- **Landing page (docs/index.rst).** Likelihood added to the method list and "Why ancify?" bullet.
+- **README.** Major expansion: **Installation** now includes prerequisites, core install, optional extras table (`evaluate`, `fast`, `ml`, `docs`, `dev`, `all`), GPU acceleration (voting only), verify-install commands, and quick-reference table. README also updated for four methods throughout (intro, confidence encoding, key fields, How it works, CLI, project structure).
+
+### Tests
+
+- **New `tests/test_likelihood.py`.** Rate-matrix properties (row sums, detailed balance, normalisation), transition-probability properties (P(0)=I, rows sum to 1, equilibrium limit), Felsenstein pruning and posteriors, confidence encoding, agreement with parsimony on unambiguous cases.
+- **`tests/test_config.py`.** New `TestValidateLikelihood` for tree requirement, model name, GTR rates, base freqs, and thresholds.
+- **`tests/test_ancestral.py`.** New `TestCallAncestralBaseLikelihood` mirroring parsimony tests.
+
+### Version and CLI
+
+- **Version** set to **1.4.0** in `pyproject.toml`.
+- **CLI template** (`EXAMPLE_CONFIG` in `cli.py`) updated with commented likelihood example and branch-length tree.
+
+---
+
 ## 1.3.0 (2026)
 
 Machine learning-based ancestral calling and documentation updates.
