@@ -137,7 +137,7 @@ def main():
                             fontsize=9)
     ax_bars.set_xlabel("")
     ax_bars.set_xlim(-0.6, n - 0.4)
-    ax_bars.set_title("Run-time by chromosome — CPU vs GPU  (Phase 1 + Phase 2 stacked)",
+    ax_bars.set_title("Run-time by chromosome — CPU vs GPU  (4 outgroups, Phase 1 + Phase 2 stacked)",
                       fontsize=13, fontweight="bold", pad=12)
 
     ax_bars.spines["top"].set_visible(False)
