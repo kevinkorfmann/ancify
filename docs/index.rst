@@ -1,8 +1,8 @@
 
 .. container:: epigraph
 
-   Was einst im tiefen Schweigen schlief,
-   ist nun ein fernes Echo seiner selbst.
+   *Was einst im tiefen Schweigen schlief,*
+   *ist nun ein fernes Echo seiner selbst.*
 
 **Ancestral allele polarization for any species.**
 
