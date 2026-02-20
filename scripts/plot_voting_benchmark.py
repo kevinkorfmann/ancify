@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Plot voting run-time: CPU vs GPU per chromosome.
+"""Plot voting benchmark: CPU vs GPU per chromosome.
 
-Reads a CSV with columns: chromosome, backend, time_sec
-or (stratified): chromosome, backend, phase1_sec, phase2_sec, time_sec.
-Writes grouped bar chart(s) to the given output path.
-If phase1_sec/phase2_sec are present, draws two panels: Phase 1 (project) and Phase 2 (voting).
+Reads a CSV with columns:
+    chromosome, backend, phase1_sec, phase2_sec, time_sec
+
+Produces a multi-panel figure:
+  - Top:    stacked bar chart (Phase 1 + Phase 2) per chromosome
+  - Bottom: Phase 2 speedup (CPU / GPU) with summary statistics
 
 Usage:
     python scripts/plot_voting_benchmark.py <timings.csv> <output.png>
@@ -15,11 +17,19 @@ import sys
 from pathlib import Path
 
 
-def _read_float(row, key, default=-1):
+def _float(row, key, default=-1.0):
     try:
         return float(row.get(key, default))
     except (ValueError, TypeError):
         return default
+
+
+def _chrom_sort_key(name):
+    """Sort chr1..chr22 numerically, then chrX, chrY, others."""
+    s = name.replace("chr", "")
+    if s.isdigit():
+        return (0, int(s))
+    return (1, ord(s[0]) if s else 0)
 
 
 def main():
@@ -38,89 +48,179 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib.patches import Patch
         import numpy as np
     except ImportError:
         print("matplotlib is required: pip install 'ancify[evaluate]'")
         sys.exit(1)
 
-    # Load data
     rows = []
-    has_phase = False
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
-        fieldnames = reader.fieldnames or []
-        has_phase = "phase1_sec" in fieldnames and "phase2_sec" in fieldnames
         for row in reader:
             chrom = row.get("chromosome", "").strip()
             backend = row.get("backend", "").strip().lower()
-            t = _read_float(row, "time_sec")
-            if chrom and backend and t >= 0:
-                p1 = _read_float(row, "phase1_sec") if has_phase else -1
-                p2 = _read_float(row, "phase2_sec") if has_phase else -1
-                rows.append((chrom, backend, p1, p2, t))
+            p1 = _float(row, "phase1_sec")
+            p2 = _float(row, "phase2_sec")
+            total = _float(row, "time_sec")
+            if chrom and backend and total >= 0:
+                rows.append({"chrom": chrom, "backend": backend,
+                             "p1": max(p1, 0), "p2": max(p2, 0),
+                             "total": total})
 
     if not rows:
-        print("No valid rows in CSV (need chromosome, backend, time_sec with time_sec >= 0).")
+        print("No valid rows in CSV.")
         sys.exit(1)
 
-    chroms = []
-    seen = set()
-    for r in rows:
-        c = r[0]
-        if c not in seen:
-            seen.add(c)
-            chroms.append(c)
-
+    chroms = sorted({r["chrom"] for r in rows}, key=_chrom_sort_key)
     n = len(chroms)
+
+    lookup = {(r["chrom"], r["backend"]): r for r in rows}
+
+    cpu_p1 = np.array([lookup.get((c, "cpu"), {}).get("p1", 0) for c in chroms])
+    cpu_p2 = np.array([lookup.get((c, "cpu"), {}).get("p2", 0) for c in chroms])
+    gpu_p1 = np.array([lookup.get((c, "gpu"), {}).get("p1", 0) for c in chroms])
+    gpu_p2 = np.array([lookup.get((c, "gpu"), {}).get("p2", 0) for c in chroms])
+
+    # Speedup (CPU / GPU) for Phase 2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        speedup_p2 = np.where(gpu_p2 > 0, cpu_p2 / gpu_p2, np.nan)
+
+    # ── Palette ──────────────────────────────────────────────
+    C_CPU_P1 = "#93c5fd"  # light blue
+    C_CPU_P2 = "#2563eb"  # blue
+    C_GPU_P1 = "#6ee7b7"  # light green
+    C_GPU_P2 = "#059669"  # teal
+    C_SPEEDUP = "#7c3aed"  # purple
+    C_GRID = "#e5e7eb"
+
+    # ── Figure layout ────────────────────────────────────────
+    fig_w = max(12, n * 0.6)
+    fig, (ax_bars, ax_speed) = plt.subplots(
+        2, 1, figsize=(fig_w, 8),
+        gridspec_kw={"height_ratios": [3, 1.2], "hspace": 0.35},
+    )
+
     x = np.arange(n)
-    width = 0.35
+    w = 0.35
 
-    def series(key_idx):
-        # key_idx: 2=phase1, 3=phase2, 4=total
-        data = {(r[0], r[1]): r[key_idx] for r in rows}
-        cpu = [data.get((c, "cpu")) or 0 for c in chroms]
-        gpu = [data.get((c, "gpu")) or 0 for c in chroms]
-        return cpu, gpu
+    # ── Top panel: stacked Phase 1 + Phase 2 bars ───────────
+    ax_bars.bar(x - w / 2, cpu_p1, w, label="CPU Phase 1 (project)",
+                color=C_CPU_P1, edgecolor="white", linewidth=0.5)
+    ax_bars.bar(x - w / 2, cpu_p2, w, bottom=cpu_p1,
+                label="CPU Phase 2 (voting)",
+                color=C_CPU_P2, edgecolor="white", linewidth=0.5)
+    ax_bars.bar(x + w / 2, gpu_p1, w, label="GPU Phase 1 (project)",
+                color=C_GPU_P1, edgecolor="white", linewidth=0.5)
+    ax_bars.bar(x + w / 2, gpu_p2, w, bottom=gpu_p1,
+                label="GPU Phase 2 (voting)",
+                color=C_GPU_P2, edgecolor="white", linewidth=0.5)
 
-    def draw_bars(ax, cpu_vals, gpu_vals, title, ylabel="Run-time (seconds)"):
-        bars_cpu = ax.bar(x - width / 2, cpu_vals, width, label="CPU", color="#2563eb", edgecolor="white", linewidth=0.8)
-        bars_gpu = ax.bar(x + width / 2, gpu_vals, width, label="GPU", color="#059669", edgecolor="white", linewidth=0.8)
-        ax.set_ylabel(ylabel, fontsize=11)
-        ax.set_xlabel("Chromosome", fontsize=11)
-        ax.set_title(title, fontsize=12, fontweight="bold")
-        ax.set_xticks(x)
-        ax.set_xticklabels(chroms, fontsize=10)
-        ax.legend(loc="upper right", fontsize=9)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        for b in bars_cpu:
-            h = b.get_height()
-            if h > 0:
-                ax.annotate(f"{h:.0f}s", xy=(b.get_x() + b.get_width() / 2, h), xytext=(0, 4),
-                            textcoords="offset points", ha="center", va="bottom", fontsize=8, fontweight="bold")
-        for b in bars_gpu:
-            h = b.get_height()
-            if h > 0:
-                ax.annotate(f"{h:.0f}s", xy=(b.get_x() + b.get_width() / 2, h), xytext=(0, 4),
-                            textcoords="offset points", ha="center", va="bottom", fontsize=8, fontweight="bold")
+    cpu_total = cpu_p1 + cpu_p2
+    gpu_total = gpu_p1 + gpu_p2
 
-    if has_phase and any(r[2] >= 0 or r[3] >= 0 for r in rows):
-        # Stratified: two panels (Phase 1 and Phase 2)
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(max(10, n * 2.2), 5))
-        cpu_p1, gpu_p1 = series(2)
-        cpu_p2, gpu_p2 = series(3)
-        draw_bars(ax1, cpu_p1, gpu_p1, "Phase 1: Project (AXT → FASTA)")
-        draw_bars(ax2, cpu_p2, gpu_p2, "Phase 2: Voting (ancestral calling)")
-        fig.suptitle("Voting run-time: CPU vs GPU (human hg38) — by phase", fontsize=13, fontweight="bold", y=1.02)
-    else:
-        # Total only
-        fig, ax = plt.subplots(figsize=(max(6, n * 1.2), 5))
-        cpu_times, gpu_times = series(4)
-        draw_bars(ax, cpu_times, gpu_times, "Voting run-time: CPU vs GPU (human hg38)")
+    label_step = 1 if n <= 8 else (2 if n <= 16 else 3)
+    for i in range(n):
+        if i % label_step == 0:
+            if cpu_total[i] > 0:
+                ax_bars.text(x[i] - w / 2, cpu_total[i] + 2, f"{cpu_total[i]:.0f}",
+                             ha="center", va="bottom", fontsize=6.5,
+                             color=C_CPU_P2, fontweight="bold")
+            if gpu_total[i] > 0:
+                ax_bars.text(x[i] + w / 2, gpu_total[i] + 2, f"{gpu_total[i]:.0f}",
+                             ha="center", va="bottom", fontsize=6.5,
+                             color=C_GPU_P2, fontweight="bold")
 
-    fig.tight_layout()
+    ax_bars.set_ylabel("Run-time (seconds)", fontsize=11, fontweight="medium")
+    ax_bars.set_xticks(x)
+    ax_bars.set_xticklabels([c.replace("chr", "") for c in chroms],
+                            fontsize=9)
+    ax_bars.set_xlabel("")
+    ax_bars.set_xlim(-0.6, n - 0.4)
+    ax_bars.set_title("Run-time by chromosome — CPU vs GPU  (Phase 1 + Phase 2 stacked)",
+                      fontsize=13, fontweight="bold", pad=12)
+
+    ax_bars.spines["top"].set_visible(False)
+    ax_bars.spines["right"].set_visible(False)
+    ax_bars.yaxis.grid(True, color=C_GRID, linewidth=0.6, zorder=0)
+    ax_bars.set_axisbelow(True)
+
+    legend_handles = [
+        Patch(facecolor=C_CPU_P1, edgecolor="white", label="CPU Phase 1"),
+        Patch(facecolor=C_CPU_P2, edgecolor="white", label="CPU Phase 2"),
+        Patch(facecolor=C_GPU_P1, edgecolor="white", label="GPU Phase 1"),
+        Patch(facecolor=C_GPU_P2, edgecolor="white", label="GPU Phase 2"),
+    ]
+    ax_bars.legend(handles=legend_handles, loc="upper right", fontsize=8,
+                   ncol=2, framealpha=0.9, edgecolor=C_GRID)
+
+    # ── Bottom panel: Phase 2 speedup ────────────────────────
+    valid = ~np.isnan(speedup_p2)
+    colors = np.where(speedup_p2[valid] >= 1, C_SPEEDUP, "#dc2626")
+
+    ax_speed.vlines(x[valid], 1, speedup_p2[valid], color=colors,
+                    linewidth=2.5, zorder=3)
+    ax_speed.scatter(x[valid], speedup_p2[valid], color=colors,
+                     s=40, zorder=4, edgecolors="white", linewidths=0.5)
+
+    ax_speed.axhline(y=1.0, color="#94a3b8", linewidth=1, linestyle="--",
+                     zorder=2)
+
+    mean_speedup = np.nanmean(speedup_p2)
+    if not np.isnan(mean_speedup):
+        ax_speed.axhline(y=mean_speedup, color=C_SPEEDUP, linewidth=1,
+                         linestyle=":", alpha=0.6, zorder=2)
+        ax_speed.text(n - 0.5, mean_speedup, f" avg {mean_speedup:.1f}×",
+                      va="center", ha="left", fontsize=8.5,
+                      color=C_SPEEDUP, fontweight="bold")
+
+    if n <= 12:
+        for i in range(n):
+            if valid[i]:
+                ax_speed.text(x[i], speedup_p2[i] + 0.08,
+                              f"{speedup_p2[i]:.1f}×",
+                              ha="center", va="bottom", fontsize=6.5,
+                              color=C_SPEEDUP, fontweight="bold")
+
+    ax_speed.set_ylabel("Phase 2 speedup\n(CPU / GPU)", fontsize=10,
+                        fontweight="medium")
+    ax_speed.set_xlabel("Chromosome", fontsize=11, fontweight="medium")
+    ax_speed.set_xticks(x)
+    ax_speed.set_xticklabels([c.replace("chr", "") for c in chroms],
+                             fontsize=9)
+    ax_speed.set_xlim(-0.6, n - 0.4)
+    ymin = min(0.5, np.nanmin(speedup_p2) - 0.3) if valid.any() else 0.5
+    ymax = max(2.0, np.nanmax(speedup_p2) + 0.5) if valid.any() else 2.0
+    ax_speed.set_ylim(ymin, ymax)
+    ax_speed.set_title("Phase 2 GPU speedup (higher = GPU faster)",
+                       fontsize=11, fontweight="bold", pad=8)
+
+    ax_speed.spines["top"].set_visible(False)
+    ax_speed.spines["right"].set_visible(False)
+    ax_speed.yaxis.grid(True, color=C_GRID, linewidth=0.6, zorder=0)
+    ax_speed.set_axisbelow(True)
+
+    # ── Summary text ─────────────────────────────────────────
+    cpu_genome = cpu_total.sum()
+    gpu_genome = gpu_total.sum()
+    overall_speedup = cpu_genome / gpu_genome if gpu_genome > 0 else float("nan")
+    cpu_p2_total = cpu_p2.sum()
+    gpu_p2_total = gpu_p2.sum()
+    p2_speedup = cpu_p2_total / gpu_p2_total if gpu_p2_total > 0 else float("nan")
+
+    summary = (
+        f"Genome-wide totals:  "
+        f"CPU {cpu_genome/60:.0f} min  |  GPU {gpu_genome/60:.0f} min  |  "
+        f"overall {overall_speedup:.2f}×    "
+        f"Phase 2 only:  "
+        f"CPU {cpu_p2_total:.0f}s  |  GPU {gpu_p2_total:.0f}s  |  "
+        f"{p2_speedup:.1f}× speedup"
+    )
+    fig.text(0.5, -0.01, summary, ha="center", va="top", fontsize=9,
+             fontstyle="italic", color="#64748b")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150)
+    fig.savefig(out_path, dpi=180, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"Saved: {out_path}")
 
