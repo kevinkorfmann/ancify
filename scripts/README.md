@@ -9,6 +9,7 @@ config generation, and running; thin wrappers set method/backend for convenience
 scripts/
 ├── run_hg38.sh             # unified runner (all env knobs)
 ├── compare_methods.sh      # run voting + parsimony + likelihood, compare output
+├── visualize_comparison.py # generate figures from comparison output
 ├── README.md
 └── examples/
     ├── chr22_voting.sh         # quick test: chr22, voting, CPU
@@ -72,10 +73,22 @@ CHROM=chr1 ./scripts/compare_methods.sh
 ## Output structure
 
 ```
-ancify_test/output_chr22/
+ancify_compare/output_chr22/
 ├── voting/chr22.fa
 ├── parsimony/chr22.fa
-└── likelihood/chr22.fa
+├── likelihood/chr22.fa
+└── figures/
+    ├── confidence_breakdown.png    # stacked bar: high/low/unresolved/missing
+    ├── pairwise_agreement.png      # heatmap of agreement rates
+    ├── disagreement_windows.png    # sliding-window disagreement along chrom
+    └── called_site_overlap.png     # which methods call which sites (3 methods)
 ```
 
-`compare_methods.sh` prints per-method coverage stats and pairwise agreement rates.
+`compare_methods.sh` prints per-method coverage stats and pairwise agreement rates,
+then generates the figures above (requires `matplotlib`: `pip install 'ancify[evaluate]'`).
+
+You can also run the visualization separately on existing output:
+
+```bash
+python scripts/visualize_comparison.py ancify_compare/output_chr22 chr22 voting parsimony likelihood
+```

@@ -107,5 +107,13 @@ for i in range(len(names)):
             print(f"  {names[i]} vs {names[j]}:  no shared called sites")
 PYEOF
 
+# ── Visualize ────────────────────────────────────────────────
+echo ""
+echo "Generating figures..."
+python3 "$SCRIPT_DIR/visualize_comparison.py" "$OUT_BASE" "$CHROM" "${METHODS[@]}" || {
+  echo "(visualization skipped — install matplotlib: pip install 'ancify[evaluate]')"
+}
+
 echo ""
 echo "Done. FASTA files in $OUT_BASE/{voting,parsimony,likelihood}/"
+echo "      Figures in $OUT_BASE/figures/"
