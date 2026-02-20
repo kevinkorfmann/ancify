@@ -1,9 +1,8 @@
-ancify — decode the root
-=========================
 
 .. container:: epigraph
 
-   The root didn't leave a note. We read the branches instead.
+   Was einst im tiefen Schweigen schlief,
+   ist nun ein fernes Echo seiner selbst.
 
 **Ancestral allele polarization for any species.**
 
