@@ -117,7 +117,7 @@ CHROM=all BACKEND=gpu ANCIFY_CPUS=24 ./scripts/run_hg38.sh
 ML_MODEL_PATH=model.lgb ./scripts/examples/chr22_ml.sh
 
 # Compare methods on a different chromosome
-CHROM=chr1 ./scripts/compare_methods.sh
+CHROM=chr22 ./scripts/compare_methods.sh
 ```
 
 ## Output structure

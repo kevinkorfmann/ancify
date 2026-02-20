@@ -1,0 +1,118 @@
+\begin{thebibliography}{14}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[DeGiorgio et~al.(2016)DeGiorgio, Huber, Hubisz, Hellmann, and
+  Nielsen]{DeGiorgio2016}
+Michael DeGiorgio, Christian~D. Huber, Melissa~J. Hubisz, Ines Hellmann, and
+  Rasmus Nielsen.
+\newblock {SweepFinder2}: increased sensitivity, robustness and flexibility.
+\newblock \emph{Bioinformatics}, 32\penalty0 (12):\penalty0 1895--1897, 2016.
+\newblock \doi{10.1093/bioinformatics/btw051}.
+
+\bibitem[Degnan and Rosenberg(2009)]{Degnan2009}
+James~H. Degnan and Noah~A. Rosenberg.
+\newblock Gene tree discordance, phylogenetic inference and the multispecies
+  coalescent.
+\newblock \emph{Trends in Ecology \& Evolution}, 24\penalty0 (6):\penalty0
+  332--340, 2009.
+\newblock \doi{10.1016/j.tree.2009.01.009}.
+
+\bibitem[Fay and Wu(2000)]{Fay2000}
+Justin~C. Fay and Chung-I Wu.
+\newblock Hitchhiking under positive {Darwinian} selection.
+\newblock \emph{Genetics}, 155\penalty0 (3):\penalty0 1405--1413, 2000.
+\newblock \doi{10.1093/genetics/155.3.1405}.
+
+\bibitem[Fitch(1971)]{Fitch1971}
+Walter~M. Fitch.
+\newblock Toward defining the course of evolution: minimum change for a
+  specific tree topology.
+\newblock \emph{Systematic Biology}, 20\penalty0 (4):\penalty0 406--416, 1971.
+\newblock \doi{10.1093/sysbio/20.4.406}.
+
+\bibitem[Gutenkunst et~al.(2009)Gutenkunst, Hernandez, Williamson, and
+  Bustamante]{Gutenkunst2009}
+Ryan~N. Gutenkunst, Ryan~D. Hernandez, Scott~H. Williamson, and Carlos~D.
+  Bustamante.
+\newblock Inferring the joint demographic history of multiple populations from
+  multidimensional {SNP} frequency data.
+\newblock \emph{PLoS Genetics}, 5\penalty0 (10):\penalty0 e1000695, 2009.
+\newblock \doi{10.1371/journal.pgen.1000695}.
+
+\bibitem[Hobolth et~al.(2011)Hobolth, Dutheil, Hawks, Schierup, and
+  Mailund]{Hobolth2011}
+Asger Hobolth, Julien~Y. Dutheil, John Hawks, Mikkel~H. Schierup, and Thomas
+  Mailund.
+\newblock Incomplete lineage sorting patterns among human, chimpanzee, and
+  orangutan suggest recent orangutan speciation and widespread selection.
+\newblock \emph{Genome Research}, 21\penalty0 (3):\penalty0 349--356, 2011.
+\newblock \doi{10.1101/gr.114751.110}.
+
+\bibitem[Jouganous et~al.(2017)Jouganous, Long, Ragsdale, and
+  Gravel]{Jouganous2017}
+Julien Jouganous, Will Long, Aaron~P. Ragsdale, and Simon Gravel.
+\newblock Inferring the joint demographic history of multiple populations:
+  beyond the diffusion approximation.
+\newblock \emph{Genetics}, 206\penalty0 (3):\penalty0 1549--1567, 2017.
+\newblock \doi{10.1534/genetics.117.200493}.
+
+\bibitem[Ke et~al.(2017)Ke, Meng, Finley, Wang, Chen, Ma, Ye, and Liu]{Ke2017}
+Guolin Ke, Qi~Meng, Thomas Finley, Taifeng Wang, Wei Chen, Weidong Ma, Qiwei
+  Ye, and Tie-Yan Liu.
+\newblock {LightGBM}: a highly efficient gradient boosting decision tree.
+\newblock \emph{Advances in Neural Information Processing Systems},
+  30:\penalty0 3146--3154, 2017.
+
+\bibitem[Kent et~al.(2003)Kent, Baertsch, Hinrichs, Miller, and
+  Haussler]{Kent2003}
+W.~James Kent, Robert Baertsch, Angie Hinrichs, Webb Miller, and David
+  Haussler.
+\newblock Evolution's cauldron: duplication, deletion, and rearrangement in the
+  mouse and human genomes.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 100\penalty0
+  (20):\penalty0 11484--11489, 2003.
+\newblock \doi{10.1073/pnas.1932072100}.
+
+\bibitem[Kimura(1983)]{Kimura1983}
+Motoo Kimura.
+\newblock The neutral theory of molecular evolution.
+\newblock \emph{Cambridge University Press}, 1983.
+
+\bibitem[Nielsen et~al.(2005)Nielsen, Williamson, Kim, Hubisz, Clark, and
+  Bustamante]{Nielsen2005}
+Rasmus Nielsen, Scott Williamson, Yuseob Kim, Melissa~J. Hubisz, Andrew~G.
+  Clark, and Carlos Bustamante.
+\newblock Genomic scans for selective sweeps using {SNP} data.
+\newblock \emph{Genome Research}, 15\penalty0 (11):\penalty0 1566--1575, 2005.
+\newblock \doi{10.1101/gr.4252305}.
+
+\bibitem[Paten et~al.(2008)Paten, Herrero, Fitzgerald, Beal, Flicek, Holmes,
+  and Birney]{Paten2008}
+Benedict Paten, Javier Herrero, Stephen Fitzgerald, Kathryn Beal, Paul Flicek,
+  Ian Holmes, and Ewan Birney.
+\newblock Genome-wide nucleotide-level mammalian ancestor reconstruction.
+\newblock \emph{Genome Research}, 18\penalty0 (11):\penalty0 1829--1843, 2008.
+\newblock \doi{10.1101/gr.076521.108}.
+
+\bibitem[Scally et~al.(2012)Scally, Dutheil, Hillier, Jordan, Goodhead,
+  Herrero, Hobolth, Lappalainen, Mailund, Marques-Bonet, et~al.]{Scally2012}
+Aylwyn Scally, Julien~Y. Dutheil, LaDeana~W. Hillier, Gregory~E. Jordan, Ian
+  Goodhead, Javier Herrero, Asger Hobolth, Tuuli Lappalainen, Thomas Mailund,
+  Tomas Marques-Bonet, et~al.
+\newblock Insights into hominid evolution from the gorilla genome sequence.
+\newblock \emph{Nature}, 483\penalty0 (7388):\penalty0 169--175, 2012.
+\newblock \doi{10.1038/nature10842}.
+
+\bibitem[Watterson(1975)]{Watterson1975}
+G.~A. Watterson.
+\newblock On the number of segregating sites in genetical models without
+  recombination.
+\newblock \emph{Theoretical Population Biology}, 7\penalty0 (2):\penalty0
+  256--276, 1975.
+\newblock \doi{10.1016/0040-5809(75)90020-9}.
+
+\end{thebibliography}
