@@ -322,6 +322,376 @@ ancify flags these as `n` rather than guessing. For most analyses, excluding the
 
 ---
 
+## Tutorial 4: Getting Ancestral FASTA Files
+
+After running the pipeline you have one FASTA file per chromosome in your
+`output_dir`. This tutorial shows how to verify, inspect, and use them.
+
+### Locate the output
+
+The output directory mirrors the `output_dir` field in your config:
+
+```bash
+ls -lh ancestral_calls/
+```
+
+```text
+ancestral_calls/
+├── chr1.fa      248 MB
+├── chr2.fa      242 MB
+├── ...
+├── chr22.fa      51 MB
+└── chrX.fa      156 MB
+```
+
+Each file is a plain-text FASTA with a single record whose sequence is
+exactly as long as the corresponding chromosome.
+
+### Quick sanity check
+
+Verify that the file length matches the chromosome length:
+
+```bash
+# Print the sequence length (excluding the header line)
+awk 'NR>1{len+=length($0)} END{print len}' ancestral_calls/chr22.fa
+# Expected: 50818468 (hg38 chr22 length)
+```
+
+Or from Python:
+
+```python
+from ancify.utils import read_fasta
+
+_, seq = read_fasta("ancestral_calls/chr22.fa")
+print(f"chr22 length: {len(seq):,}")
+```
+
+### Read a single position
+
+Positions are 0-indexed in the sequence string (matching Python conventions)
+but 1-indexed in genomic coordinates. To look up a 1-based genomic position:
+
+```python
+from ancify.utils import read_fasta
+
+_, seq = read_fasta("ancestral_calls/chr22.fa")
+
+pos = 16_050_075                # 1-based genomic coordinate
+allele = seq[pos - 1]           # convert to 0-based
+
+if allele.upper() in "ACGT":
+    confidence = "high" if allele.isupper() else "low"
+    print(f"chr22:{pos}  ancestral = {allele.upper()}  ({confidence} confidence)")
+else:
+    print(f"chr22:{pos}  no ancestral call ({allele})")
+```
+
+### Load all chromosomes into a dictionary
+
+For genome-wide analyses it is convenient to load everything once:
+
+```python
+from pathlib import Path
+from ancify.utils import read_fasta
+
+anc_dir = Path("ancestral_calls")
+ancestral = {}
+
+for fa in sorted(anc_dir.glob("chr*.fa")):
+    chrom = fa.stem                       # "chr1", "chr22", ...
+    _, ancestral[chrom] = read_fasta(fa)
+    print(f"  loaded {chrom} ({len(ancestral[chrom]):,} bp)")
+
+print(f"\nLoaded {len(ancestral)} chromosomes")
+```
+
+### Confidence encoding recap
+
+| Character | Meaning |
+|-----------|---------|
+| `A` `C` `G` `T` | High confidence — inner and outer outgroups agree |
+| `a` `c` `g` `t` | Low confidence — only one tier had data |
+| `n` | Unresolved — the two tiers disagree |
+| `N` | Missing — no outgroup data |
+
+Filter by confidence depending on your tolerance for noise:
+
+```python
+# Strict: high-confidence only
+if allele in "ACGT":
+    use(allele)
+
+# Lenient: any call (high or low)
+if allele.upper() in "ACGT":
+    use(allele.upper())
+```
+
+---
+
+## Tutorial 5: Polarizing VCF Variants
+
+*Annotate every variant in a VCF as ancestral or derived.*
+
+Polarization means labelling which allele (REF or ALT) was present in the
+common ancestor. This is essential for computing the **unfolded site
+frequency spectrum**, McDonald–Kreitman tests, and any analysis that
+distinguishes ancestral from derived mutations.
+
+### Prerequisites
+
+- Ancestral FASTA files from Tutorial 4 (or the quickstart)
+- A VCF file for the same reference genome (e.g. 1000 Genomes on GRCh38)
+- `cyvcf2` (recommended) or `pysam` for reading VCFs — install with
+  `pip install cyvcf2`
+
+### Concept
+
+For each biallelic SNP in the VCF:
+
+1. Look up the ancestral allele at that position from the FASTA.
+2. Compare it to REF and ALT.
+3. If the ancestral allele matches REF → ALT is derived.
+4. If the ancestral allele matches ALT → REF is derived (the reference
+   genome carries the derived allele at this site).
+5. If it matches neither → the variant cannot be polarized.
+
+### Minimal example
+
+```python
+from cyvcf2 import VCF
+from ancify.utils import read_fasta
+
+_, seq = read_fasta("ancestral_calls/chr22.fa")
+
+for v in VCF("chr22.vcf.gz"):
+    if len(v.ALT) != 1 or len(v.REF) != 1 or len(v.ALT[0]) != 1:
+        continue  # skip multiallelic and indels
+
+    anc = seq[v.POS - 1].upper()
+    if anc not in "ACGT":
+        continue  # no ancestral call
+
+    if anc == v.REF:
+        print(f"{v.CHROM}:{v.POS}  REF={v.REF} is ancestral, ALT={v.ALT[0]} is derived")
+    elif anc == v.ALT[0]:
+        print(f"{v.CHROM}:{v.POS}  ALT={v.ALT[0]} is ancestral, REF={v.REF} is derived")
+    else:
+        print(f"{v.CHROM}:{v.POS}  ancestral {anc} matches neither REF nor ALT")
+```
+
+### Complete script: write an annotated VCF
+
+The script below reads a VCF, adds an `AA` INFO field (ancestral allele),
+and writes a new VCF with polarization annotations:
+
+```python
+#!/usr/bin/env python3
+"""Polarize a VCF using ancify ancestral FASTA files.
+
+Usage:
+    python polarize_vcf.py \
+        --anc-dir ancestral_calls/ \
+        --vcf input.vcf.gz \
+        --out polarized.vcf.gz
+"""
+
+import argparse
+from pathlib import Path
+
+from cyvcf2 import VCF, Writer
+from ancify.utils import read_fasta
+
+
+def load_ancestral(anc_dir):
+    """Load all ancestral FASTA files into a dict keyed by chromosome name."""
+    seqs = {}
+    for fa in Path(anc_dir).glob("*.fa"):
+        chrom = fa.stem
+        _, seqs[chrom] = read_fasta(fa)
+    return seqs
+
+
+def polarize(vcf_path, anc_dir, out_path, high_confidence_only=False):
+    vcf = VCF(str(vcf_path))
+    vcf.add_info_to_header({
+        "ID": "AA",
+        "Number": "1",
+        "Type": "String",
+        "Description": "Ancestral allele inferred by ancify",
+    })
+    vcf.add_info_to_header({
+        "ID": "DAF",
+        "Number": "1",
+        "Type": "String",
+        "Description": "Derived allele: REF or ALT (or . if ambiguous)",
+    })
+
+    w = Writer(str(out_path), vcf)
+    ancestral = load_ancestral(anc_dir)
+
+    counts = {"ref_ancestral": 0, "alt_ancestral": 0, "nomatch": 0, "skipped": 0}
+
+    for v in vcf:
+        seq = ancestral.get(v.CHROM)
+        if seq is None or v.POS - 1 >= len(seq):
+            counts["skipped"] += 1
+            w.write_record(v)
+            continue
+
+        allele = seq[v.POS - 1]
+        if high_confidence_only and not allele.isupper():
+            counts["skipped"] += 1
+            w.write_record(v)
+            continue
+
+        anc = allele.upper()
+        if anc not in "ACGT":
+            counts["skipped"] += 1
+            w.write_record(v)
+            continue
+
+        v.INFO["AA"] = anc
+
+        if len(v.ALT) == 1 and len(v.REF) == 1 and len(v.ALT[0]) == 1:
+            if anc == v.REF:
+                v.INFO["DAF"] = "ALT"
+                counts["ref_ancestral"] += 1
+            elif anc == v.ALT[0]:
+                v.INFO["DAF"] = "REF"
+                counts["alt_ancestral"] += 1
+            else:
+                v.INFO["DAF"] = "."
+                counts["nomatch"] += 1
+
+        w.write_record(v)
+
+    w.close()
+    vcf.close()
+
+    total = sum(counts.values())
+    print(f"Polarized {total:,} variants:")
+    print(f"  REF is ancestral:  {counts['ref_ancestral']:>10,}")
+    print(f"  ALT is ancestral:  {counts['alt_ancestral']:>10,}")
+    print(f"  No match:          {counts['nomatch']:>10,}")
+    print(f"  Skipped:           {counts['skipped']:>10,}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Polarize VCF with ancestral alleles")
+    parser.add_argument("--anc-dir", required=True, help="Directory with ancestral chr*.fa files")
+    parser.add_argument("--vcf", required=True, help="Input VCF (optionally gzipped)")
+    parser.add_argument("--out", required=True, help="Output VCF path")
+    parser.add_argument("--high-only", action="store_true",
+                        help="Only use high-confidence calls (uppercase)")
+    args = parser.parse_args()
+    polarize(args.vcf, args.anc_dir, args.out, high_confidence_only=args.high_only)
+```
+
+Save this as `polarize_vcf.py` and run:
+
+```bash
+python polarize_vcf.py \
+    --anc-dir ancestral_calls/ \
+    --vcf ALL.chr22.vcf.gz \
+    --out chr22_polarized.vcf.gz
+```
+
+### Using scikit-allel instead of cyvcf2
+
+If you already have `scikit-allel` installed (it ships with
+`pip install 'ancify[evaluate]'`), you can polarize without cyvcf2:
+
+```python
+import allel
+import numpy as np
+from ancify.utils import read_fasta
+
+_, seq = read_fasta("ancestral_calls/chr22.fa")
+
+vcf = allel.read_vcf(
+    "chr22.vcf.gz",
+    fields=["variants/POS", "variants/REF", "variants/ALT"],
+)
+
+pos = vcf["variants/POS"]
+ref = vcf["variants/REF"]
+alt = vcf["variants/ALT"][:, 0]
+
+anc = np.array(list(seq), dtype="U1")[pos - 1]
+anc_upper = np.char.upper(anc)
+
+valid = np.isin(anc_upper, list("ACGT"))
+ref_is_anc = (anc_upper == ref) & valid
+alt_is_anc = (anc_upper == alt) & valid
+
+print(f"Total SNPs:          {len(pos):>10,}")
+print(f"With ancestral call: {valid.sum():>10,}")
+print(f"REF is ancestral:    {ref_is_anc.sum():>10,}")
+print(f"ALT is ancestral:    {alt_is_anc.sum():>10,}")
+```
+
+### Computing the unfolded site frequency spectrum
+
+Once variants are polarized, computing the unfolded SFS is straightforward.
+The derived allele frequency at each site is the frequency of whichever
+allele is *not* the ancestral one:
+
+```python
+import allel
+import numpy as np
+from ancify.utils import read_fasta
+
+_, seq = read_fasta("ancestral_calls/chr22.fa")
+
+vcf = allel.read_vcf(
+    "chr22.vcf.gz",
+    fields=["variants/POS", "variants/REF", "variants/ALT", "calldata/GT"],
+)
+
+pos = vcf["variants/POS"]
+ref = vcf["variants/REF"]
+alt = vcf["variants/ALT"][:, 0]
+gt = allel.GenotypeArray(vcf["calldata/GT"])
+
+anc = np.array(list(seq), dtype="U1")[pos - 1]
+anc_upper = np.char.upper(anc)
+
+ref_is_anc = anc_upper == ref
+alt_is_anc = anc_upper == alt
+valid = ref_is_anc | alt_is_anc
+
+ac = gt[valid].count_alleles()
+n_samples = gt.shape[1]
+n_chroms = 2 * n_samples
+
+dac = np.where(
+    ref_is_anc[valid],
+    ac[:, 1],          # ALT count = derived count
+    ac[:, 0],          # REF count = derived count (ALT is ancestral)
+)
+
+sfs = np.bincount(dac, minlength=n_chroms + 1)
+
+print("Unfolded SFS (first 10 bins):")
+for i in range(min(10, len(sfs))):
+    print(f"  DAC={i}: {sfs[i]:,} sites")
+```
+
+### Tips
+
+- **Use high-confidence calls for SFS analyses.** Low-confidence calls can
+  introduce polarization errors that inflate the high-frequency derived
+  class. Pass `--high-only` to the script above, or filter in code with
+  `allele.isupper()`.
+- **Exclude `n` (unresolved) sites.** These are positions where inner and
+  outer outgroups disagree — possibly due to incomplete lineage sorting.
+  They are already excluded by the `anc not in "ACGT"` check above.
+- **Watch for REF bias.** In most VCFs, REF is the reference genome allele,
+  which is often the major allele. Expect `REF is ancestral` to be the most
+  common outcome (~90% for human common variants).
+
+---
+
 ## Next steps
 
 | I want to... | Go to... |
