@@ -8,7 +8,7 @@ cd ancify
 pip install .
 ```
 
-That is all you need for the core pipeline (Phases 1 and 2). The **voting**,
+That is all you need for the core pipeline (Phases 1 and 2). To run a **one-chromosome example** right away (human chr22, mouse chr19, or Drosophila chr4), see the "Try the example scripts" section in {doc}`quickstart` or the table in {doc}`tutorials`. The **voting**,
 **parsimony**, and **likelihood** inference methods work out of the box; SciPy
 is included for the likelihood method.
 

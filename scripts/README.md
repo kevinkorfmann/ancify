@@ -1,26 +1,32 @@
 # Scripts
 
-Test ancify end-to-end on real UCSC data. One unified script handles downloading,
-config generation, and running; thin wrappers set method/backend for convenience.
+Test ancify end-to-end on real data. Each species has its own runner script that
+handles downloading (where available), config generation, and pipeline execution.
+Examples are organised by species, each running **one chromosome** for a quick test.
 
 ## Layout
 
 ```
 scripts/
-├── run_hg38.sh             # unified runner (all env knobs)
-├── compare_methods.sh      # run voting + parsimony + likelihood, compare output
-├── visualize_comparison.py # generate figures from comparison output
+├── run_hg38.sh              # human (hg38) — downloads from UCSC
+├── run_mm39.sh              # mouse (mm39) — downloads from UCSC
+├── run_dm6.sh               # Drosophila melanogaster (dm6) — downloads from UCSC
+├── run_brassica.sh          # Brassica rapa — requires pre-downloaded data
+├── compare_methods.sh       # run voting + parsimony + likelihood, compare output
+├── visualize_comparison.py  # generate figures from comparison output
 ├── README.md
 └── examples/
-    ├── chr22_voting.sh         # quick test: chr22, voting, CPU
-    ├── chr22_voting_gpu.sh     # quick test: chr22, voting, GPU
-    ├── chr22_parsimony.sh      # chr22, Fitch parsimony
-    ├── chr22_likelihood.sh     # chr22, likelihood (HKY85)
-    ├── chr22_ml.sh             # chr22, LightGBM (needs ML_MODEL_PATH)
-    ├── full_voting.sh          # full genome, voting
-    ├── full_voting_gpu.sh      # full genome, voting, GPU
-    ├── full_parsimony.sh       # full genome, parsimony
-    └── full_likelihood.sh      # full genome, likelihood
+    ├── human/
+    │   ├── run.sh               # chr22, voting, CPU
+    │   ├── run_parsimony.sh     # chr22, Fitch parsimony
+    │   ├── run_likelihood.sh    # chr22, likelihood (HKY85)
+    │   └── run_voting_gpu.sh    # chr22, voting, GPU
+    ├── mouse/
+    │   └── run.sh               # chr19, voting, CPU
+    ├── drosophila/
+    │   └── run.sh               # chrom 4, voting, CPU
+    └── brassica_rapa/
+        └── run.sh               # A01, voting, CPU (needs data)
 ```
 
 ## Install (uv or pip)
@@ -35,8 +41,8 @@ uv sync
 pip install .
 ```
 
-For visualization (after `compare_methods.sh`): `uv sync --extra evaluate` or `pip install 'ancify[evaluate]'`.  
-For GPU: install PyTorch with CUDA (e.g. `pip install torch` with a CUDA-enabled build).  
+For visualization (after `compare_methods.sh`): `uv sync --extra evaluate` or `pip install 'ancify[evaluate]'`.
+For GPU: install PyTorch with CUDA (e.g. `pip install torch` with a CUDA-enabled build).
 For ML: `uv sync --extra ml` or `pip install 'ancify[ml]'`.
 
 ## Prerequisites
@@ -45,82 +51,103 @@ For ML: `uv sync --extra ml` or `pip install 'ancify[ml]'`.
 - `wget` and `curl`
 - For GPU: PyTorch with CUDA
 - For ML: trained model (`ancify train -c config.yaml -o model.lgb`)
-
-## How to run
-
-From the **repo root**:
-
-```bash
-# Default: chr22, voting, auto backend
-./scripts/run_hg38.sh
-
-# Compare all three methods on chr22 (subdirs + figures)
-./scripts/compare_methods.sh
-
-# Or use an example wrapper
-./scripts/examples/chr22_parsimony.sh
-```
+- For Brassica rapa: alignment files placed in `WORK_DIR` (see `run_brassica.sh` header)
 
 ## Quick start
 
 ```bash
-# Chr22, voting, CPU
-./scripts/run_hg38.sh
+# Human — chr22, voting, CPU
+./scripts/examples/human/run.sh
 
-# Compare voting / parsimony / likelihood on chr22
+# Mouse — chr19, voting, CPU
+./scripts/examples/mouse/run.sh
+
+# Drosophila — chrom 4, voting, CPU
+./scripts/examples/drosophila/run.sh
+
+# Brassica rapa — A01, voting (needs data in WORK_DIR first)
+./scripts/examples/brassica_rapa/run.sh
+```
+
+Or call a runner directly with env overrides:
+
+```bash
+# Human chr22, parsimony
+CHROM=chr22 METHOD=parsimony ./scripts/run_hg38.sh
+
+# Mouse chr1 instead of chr19
+CHROM=chr1 ./scripts/run_mm39.sh
+
+# Drosophila 2L instead of 4
+CHROM=2L ./scripts/run_dm6.sh
+```
+
+## Compare methods (human chr22)
+
+```bash
+# Voting + parsimony + likelihood on chr22, then figures
 ./scripts/compare_methods.sh
-
-# Chr22 with a specific method
-./scripts/examples/chr22_parsimony.sh
 ```
 
-## Run only GPU options
+## Voting CPU vs GPU benchmark (human)
 
-Use the GPU backend for chr22 (quick) and optionally full genome:
+Compare run-time for **voting only** on several chromosomes, CPU vs GPU, and plot results:
 
 ```bash
-# Chr22 only, GPU
-BACKEND=gpu ./scripts/run_hg38.sh
-
-# Chr22 then full genome, both on GPU
-BACKEND=gpu ./scripts/run_hg38.sh && CHROM=all BACKEND=gpu ANCIFY_CPUS=8 ./scripts/run_hg38.sh
+# Default: chr20, chr21, chr22 (voting only)
+./scripts/benchmark_voting_cpu_gpu.sh
 ```
 
-Or the example wrappers:
+Custom chromosomes:
 
 ```bash
-./scripts/examples/chr22_voting_gpu.sh
-./scripts/examples/full_voting_gpu.sh
+CHROMOSOMES="chr21 chr22" ./scripts/benchmark_voting_cpu_gpu.sh
 ```
 
-## Environment variables
+Timings are stratified by phase: **Phase 1** (project: AXT → projected FASTA) and **Phase 2** (voting: ancestral calling). Results go to `ancify_voting_bench/voting_timings.csv` (columns: chromosome, backend, phase1_sec, phase2_sec, time_sec) and a two-panel bar chart to `ancify_voting_bench/voting_cpu_vs_gpu.png`. Set `SKIP_PLOT=1` to skip the figure.
+
+## GPU examples
+
+```bash
+# Human chr22, GPU
+./scripts/examples/human/run_voting_gpu.sh
+
+# Or any species with env override
+BACKEND=gpu ./scripts/examples/mouse/run.sh
+```
+
+## Species runners — environment variables
+
+All four runners share the same env-var interface:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CHROM` | `chr22` | Chromosome to process, or `all` for chr1-22 + chrX |
+| `CHROM` | species-specific | Chromosome to process (single) |
 | `METHOD` | `voting` | `voting`, `parsimony`, `likelihood`, or `ml` |
 | `BACKEND` | `auto` | `auto`, `cpu`, or `gpu` |
 | `ANCIFY_CPUS` | `4` | Number of parallel workers |
-| `WORK_DIR` | `ancify_test` | Working directory (downloads + output) |
+| `WORK_DIR` | species-specific | Working directory (downloads + output) |
 | `ML_MODEL_PATH` | — | Path to `.lgb` model (required for `ml`) |
 
-## Examples
+Default chromosomes per species:
 
-```bash
-# GPU + likelihood on chr22
-BACKEND=gpu METHOD=likelihood ./scripts/run_hg38.sh
-
-# Full genome on GPU with 24 cores
-CHROM=all BACKEND=gpu ANCIFY_CPUS=24 ./scripts/run_hg38.sh
-
-# ML on chr22
-ML_MODEL_PATH=model.lgb ./scripts/examples/chr22_ml.sh
-
-# Compare methods on a different chromosome
-CHROM=chr22 ./scripts/compare_methods.sh
-```
+| Runner | Species | Default `CHROM` | Default `WORK_DIR` |
+|--------|---------|-----------------|---------------------|
+| `run_hg38.sh` | Human | `chr22` | `ancify_test` |
+| `run_mm39.sh` | Mouse | `chr19` | `ancify_test_mouse` |
+| `run_dm6.sh` | Drosophila | `4` | `ancify_test_dm6` |
+| `run_brassica.sh` | Brassica rapa | `A01` | `ancify_test_brassica` |
 
 ## Output structure
+
+Each run produces output under `WORK_DIR/output_<CHROM>/<METHOD>/`:
+
+```
+ancify_test_mouse/output_chr19/voting/chr19.fa
+ancify_test_dm6/output_4/voting/4.fa
+```
+
+For `compare_methods.sh` (human chr22):
 
 ```
 ancify_compare/output_chr22/
@@ -128,14 +155,11 @@ ancify_compare/output_chr22/
 ├── parsimony/chr22.fa
 ├── likelihood/chr22.fa
 └── figures/
-    ├── confidence_breakdown.png    # stacked bar: high/low/unresolved/missing
-    ├── pairwise_agreement.png      # heatmap of agreement rates
-    ├── disagreement_windows.png    # sliding-window disagreement along chrom
-    └── called_site_overlap.png     # which methods call which sites (3 methods)
+    ├── confidence_breakdown.png
+    ├── pairwise_agreement.png
+    ├── disagreement_windows.png
+    └── called_site_overlap.png
 ```
-
-`compare_methods.sh` prints per-method coverage stats and pairwise agreement rates,
-then generates the figures above (requires `matplotlib`: `pip install 'ancify[evaluate]'`).
 
 You can also run the visualization separately on existing output:
 

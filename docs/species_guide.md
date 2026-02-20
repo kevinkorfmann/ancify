@@ -72,6 +72,10 @@ Look for directories named `vs<Outgroup>`. If the alignment exists, you are in b
 
 ## Worked examples
 
+:::{tip}
+**Quick test:** The repo includes one-chromosome example scripts for human (chr22), mouse (chr19), Drosophila (chr4), and Brassica rapa (A01). From the repo root run e.g. `./scripts/examples/human/run.sh`. See {doc}`quickstart` and `scripts/README.md`.
+:::
+
 ### Human (hg38) — the gold standard
 
 ```yaml

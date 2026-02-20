@@ -4,6 +4,21 @@
 
 ---
 
+## Bundled example scripts
+
+The repo includes **one-chromosome example scripts** per species so you can test ancify without writing a config. From the repo root:
+
+| Species | Command | Chromosome | Data |
+|---------|---------|------------|------|
+| Human | `./scripts/examples/human/run.sh` | chr22 | Auto-downloaded from UCSC |
+| Mouse | `./scripts/examples/mouse/run.sh` | chr19 | Auto-downloaded from UCSC |
+| Drosophila | `./scripts/examples/drosophila/run.sh` | 4 | Auto-downloaded from UCSC |
+| Brassica rapa | `./scripts/examples/brassica_rapa/run.sh` | A01 | You provide alignments |
+
+Human also has `run_parsimony.sh`, `run_likelihood.sh`, and `run_voting_gpu.sh` in `scripts/examples/human/`. To compare voting, parsimony, and likelihood on chr22 and generate figures, run `./scripts/compare_methods.sh`. Full details: `scripts/README.md`.
+
+---
+
 ## Tutorial 1: Polarizing the Human Genome
 
 This is the original use case that motivated ancify. You will polarize all human chromosomes using four great-ape and Old World monkey outgroups.

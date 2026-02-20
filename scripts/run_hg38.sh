@@ -5,12 +5,13 @@
 # scope, method, and backend.
 #
 # Env:
-#   CHROM       chr22 (default) or "all" (autosomes + chrX)
-#   METHOD      voting (default), parsimony, likelihood, ml
-#   BACKEND     auto (default), cpu, gpu
-#   ANCIFY_CPUS number of workers (default: 4)
-#   WORK_DIR    working directory (default: repo/ancify_test)
+#   CHROM        chr22 (default) or "all" (autosomes + chrX)
+#   METHOD       voting (default), parsimony, likelihood, ml
+#   BACKEND      auto (default), cpu, gpu
+#   ANCIFY_CPUS  number of workers (default: 4)
+#   WORK_DIR     working directory (default: repo/ancify_test)
 #   ML_MODEL_PATH  path to trained .lgb model (required if ml)
+#   CONFIG_ONLY  if set, write config (and ensure downloads) then exit (no run)
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -161,6 +162,11 @@ EOF
 } > "$CONFIG"
 
 echo "[config] $CONFIG"
+
+if [[ -n "${CONFIG_ONLY:-}" ]]; then
+  echo "CONFIG_ONLY set — skipping ancify run."
+  exit 0
+fi
 
 # ── Run ──────────────────────────────────────────────────────
 echo "[run] ancify run -c $CONFIG"

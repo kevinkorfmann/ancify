@@ -29,6 +29,26 @@ ancify --help
 
 You should see a help message listing the available subcommands (`init`, `project`, `call`, `evaluate`, `run`, `train`).
 
+### Try the example scripts (optional)
+
+If you cloned the ancify repo, you can run **one-chromosome examples** per species without writing a config. The scripts download UCSC data where available and run the pipeline. From the repo root:
+
+```bash
+# Human — chr22, voting (downloads from UCSC)
+./scripts/examples/human/run.sh
+
+# Mouse — chr19, voting (downloads from UCSC)
+./scripts/examples/mouse/run.sh
+
+# Drosophila — chromosome 4, voting (downloads from UCSC)
+./scripts/examples/drosophila/run.sh
+
+# Brassica rapa — A01 (requires alignment data in WORK_DIR; see scripts/run_brassica.sh)
+./scripts/examples/brassica_rapa/run.sh
+```
+
+Examples are grouped by species under `scripts/examples/` (human, mouse, drosophila, brassica_rapa). Human also has `run_parsimony.sh`, `run_likelihood.sh`, and `run_voting_gpu.sh` for chr22. See `scripts/README.md` for the full layout, env vars, and method comparison (`compare_methods.sh`).
+
 ## Step 2: Generate a config template
 
 ```bash
