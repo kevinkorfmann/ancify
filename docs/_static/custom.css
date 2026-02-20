@@ -5,12 +5,9 @@
     height: auto;
 }
 
-/* Epigraph / poem at top of index — cursive, subdued */
+/* Epigraph at top of index — light gray, no special font */
 .epigraph {
-    font-family: "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive;
-    font-size: 1.15rem;
-    font-style: italic;
-    color: #5a6c7d;
+    color: #9ca3af;
     margin: 0.5em 0 1.25em 0;
     line-height: 1.5;
     max-width: 28em;
