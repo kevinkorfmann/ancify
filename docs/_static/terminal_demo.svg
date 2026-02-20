@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="520" viewBox="0 0 720 520">
+  <style>
+    @keyframes type1  { from { width: 0 } to { width: 14ch } }
+    @keyframes type2  { from { width: 0 } to { width: 27ch } }
+    @keyframes type3  { from { width: 0 } to { width: 24ch } }
+    @keyframes type4  { from { width: 0 } to { width: 50ch } }
+    @keyframes type5  { from { width: 0 } to { width: 41ch } }
+    @keyframes type6  { from { width: 0 } to { width: 37ch } }
+    @keyframes type7  { from { width: 0 } to { width: 44ch } }
+    @keyframes fadein { from { opacity: 0 } to { opacity: 1 } }
+
+    .term-bg { fill: #1a1b26; rx: 10; }
+    .titlebar { fill: #24283b; }
+    .btn { cy: 22; }
+    .btn-r { fill: #f7768e; cx: 20; }
+    .btn-y { fill: #e0af68; cx: 38; }
+    .btn-g { fill: #9ece6a; cx: 56; }
+    .title { fill: #565f89; font: 12px "SF Mono", "Fira Code", monospace; }
+    text { font: 14px "SF Mono", "Fira Code", "Cascadia Code", monospace; }
+    .prompt { fill: #7aa2f7; }
+    .cmd { fill: #c0caf5; overflow: hidden; white-space: nowrap; }
+    .comment { fill: #565f89; font-style: italic; }
+    .output { fill: #787c99; }
+    .highlight { fill: #9ece6a; }
+    .flag { fill: #bb9af7; }
+    .warn { fill: #e0af68; }
+    .conf-high { fill: #9ece6a; }
+    .conf-low { fill: #7aa2f7; }
+    .conf-n { fill: #e0af68; }
+    .conf-N { fill: #565f89; }
+
+    .line1 .cmd { animation: type1 0.7s steps(14) 0.5s both; }
+    .line2 .cmd { animation: type2 1.0s steps(27) 2.0s both; }
+    .line3 .cmd { animation: type3 0.9s steps(24) 4.5s both; }
+    .line4 { animation: fadein 0.3s ease 5.8s both; }
+    .line5 { animation: fadein 0.3s ease 6.5s both; }
+    .line6 { animation: fadein 0.3s ease 7.2s both; }
+    .line7 { animation: fadein 0.3s ease 8.0s both; }
+    .line8 { animation: fadein 0.3s ease 9.0s both; }
+    .line9 .cmd { animation: type4 1.5s steps(50) 10.0s both; }
+    .line10 { animation: fadein 0.3s ease 12.0s both; }
+    .line11 { animation: fadein 0.3s ease 12.8s both; }
+    .line12 { animation: fadein 0.3s ease 13.5s both; }
+    .line13 { animation: fadein 0.3s ease 14.5s both; }
+    .line14 { animation: fadein 0.3s ease 15.5s both; }
+    .line15 { animation: fadein 0.3s ease 16.5s both; }
+  </style>
+
+  <!-- Window chrome -->
+  <rect class="term-bg" width="720" height="520" />
+  <rect class="titlebar" width="720" height="38" rx="10" />
+  <rect class="titlebar" width="720" height="10" y="28" />
+  <circle class="btn btn-r" r="6" />
+  <circle class="btn btn-y" r="6" />
+  <circle class="btn btn-g" r="6" />
+  <text class="title" x="320" y="25" text-anchor="middle">ancify  decode the root</text>
+
+  <g transform="translate(20, 60)">
+    <!-- Line 1: pip install -->
+    <g class="line1">
+      <text class="prompt" y="0">$</text>
+      <text class="cmd" x="16" y="0">pip install .</text>
+    </g>
+
+    <!-- Line 2: ancify init -->
+    <g class="line2">
+      <text class="prompt" y="30">$</text>
+      <text class="cmd" x="16" y="30">ancify init <tspan class="flag">-o</tspan> config.yaml</text>
+    </g>
+
+    <!-- Line 3: ancify run -->
+    <g class="line3">
+      <text class="prompt" y="60">$</text>
+      <text class="cmd" x="16" y="60">ancify run <tspan class="flag">-c</tspan> config.yaml</text>
+    </g>
+
+    <!-- Phase 1 output -->
+    <g class="line4">
+      <text class="output" y="100">Phase 1: projecting 4 outgroups × 23 chromosomes...</text>
+    </g>
+    <g class="line5">
+      <text class="output" y="120">   bonobo     chimp     gorilla     macaque</text>
+    </g>
+
+    <!-- Phase 2 output -->
+    <g class="line6">
+      <text class="output" y="150">Phase 2: calling ancestral alleles...</text>
+    </g>
+    <g class="line7">
+      <text class="highlight" y="170">Done. Output: ./ancestral_calls/</text>
+    </g>
+
+    <!-- Blank + confidence legend -->
+    <g class="line8">
+      <text class="output" y="210">Confidence encoding:</text>
+      <text class="conf-high" y="230">  ACGT</text>
+      <text class="output" x="70" y="230">high  both tiers agree</text>
+      <text class="conf-low" y="250">  acgt</text>
+      <text class="output" x="70" y="250">low   one tier only</text>
+      <text class="conf-n" y="270">  n</text>
+      <text class="output" x="70" y="270">unresolved  tiers disagree</text>
+      <text class="conf-N" y="290">  N</text>
+      <text class="output" x="70" y="290">missing  no outgroup data</text>
+    </g>
+
+    <!-- Line 9: head command -->
+    <g class="line9">
+      <text class="prompt" y="330">$</text>
+      <text class="cmd" x="16" y="330">head <tspan class="flag">-c</tspan> 60 ancestral_calls/chr22.fa</text>
+    </g>
+
+    <!-- FASTA output -->
+    <g class="line10">
+      <text class="output" y="360">&gt;chr22</text>
+    </g>
+    <g class="line11">
+      <text y="380">
+        <tspan class="conf-high">ACGTACGT</tspan><tspan class="conf-low">acgt</tspan><tspan class="conf-high">ACGT</tspan><tspan class="conf-N">NNNN</tspan><tspan class="conf-high">ACGT</tspan><tspan class="conf-low">acgt</tspan><tspan class="conf-high">ACGT</tspan><tspan class="conf-n">n</tspan><tspan class="conf-high">ACGT</tspan>
+      </text>
+    </g>
+
+    <!-- Stats line -->
+    <g class="line12">
+      <text class="output" y="410"> </text>
+    </g>
+    <g class="line13">
+      <text class="output" y="420">chr22:  <tspan class="conf-high">74.6%</tspan> high   <tspan class="conf-low">15.8%</tspan> low   <tspan class="conf-n">0.1%</tspan> unresolved   <tspan class="conf-N">9.5%</tspan> missing</text>
+    </g>
+
+    <!-- Prompt -->
+    <g class="line14">
+      <text class="prompt" y="450">$</text>
+      <text class="cmd" x="16" y="450">
+        <tspan class="comment"># ancestral alleles, decoded.</tspan>
+      </text>
+    </g>
+  </g>
+</svg>

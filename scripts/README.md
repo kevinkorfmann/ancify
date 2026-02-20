@@ -23,24 +23,74 @@ scripts/
     └── full_likelihood.sh      # full genome, likelihood
 ```
 
+## Install (uv or pip)
+
+From the repo root:
+
+```bash
+# With uv (recommended)
+uv sync
+
+# Or with pip
+pip install .
+```
+
+For visualization (after `compare_methods.sh`): `uv sync --extra evaluate` or `pip install 'ancify[evaluate]'`.  
+For GPU: install PyTorch with CUDA (e.g. `pip install torch` with a CUDA-enabled build).  
+For ML: `uv sync --extra ml` or `pip install 'ancify[ml]'`.
+
 ## Prerequisites
 
-- `ancify` installed (`pip install .`)
+- `ancify` installed (see above)
 - `wget` and `curl`
 - For GPU: PyTorch with CUDA
 - For ML: trained model (`ancify train -c config.yaml -o model.lgb`)
 
-## Quick start
+## How to run
+
+From the **repo root**:
 
 ```bash
 # Default: chr22, voting, auto backend
 ./scripts/run_hg38.sh
 
-# Compare all three methods on chr22 (subdirs for easy diff)
+# Compare all three methods on chr22 (subdirs + figures)
 ./scripts/compare_methods.sh
 
-# Or use a wrapper
+# Or use an example wrapper
 ./scripts/examples/chr22_parsimony.sh
+```
+
+## Quick start
+
+```bash
+# Chr22, voting, CPU
+./scripts/run_hg38.sh
+
+# Compare voting / parsimony / likelihood on chr22
+./scripts/compare_methods.sh
+
+# Chr22 with a specific method
+./scripts/examples/chr22_parsimony.sh
+```
+
+## Run only GPU options
+
+Use the GPU backend for chr22 (quick) and optionally full genome:
+
+```bash
+# Chr22 only, GPU
+BACKEND=gpu ./scripts/run_hg38.sh
+
+# Chr22 then full genome, both on GPU
+BACKEND=gpu ./scripts/run_hg38.sh && CHROM=all BACKEND=gpu ANCIFY_CPUS=8 ./scripts/run_hg38.sh
+```
+
+Or the example wrappers:
+
+```bash
+./scripts/examples/chr22_voting_gpu.sh
+./scripts/examples/full_voting_gpu.sh
 ```
 
 ## Environment variables
