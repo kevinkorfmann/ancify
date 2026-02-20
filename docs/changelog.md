@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 (2026)
+
+Machine learning-based ancestral calling and documentation updates.
+
+- **ML-based ancestral calling.** New `method: ml` option uses a LightGBM gradient-boosted classifier trained on per-position features (outgroup agreement, GC content, CpG flag, etc.) to predict ancestral alleles. Confidence is derived from predicted class probabilities. Install with `pip install 'ancify[ml]'` (requires `lightgbm` and `scikit-learn`).
+- **New `ancify.ml` module.** Feature extraction (`extract_features()`), model loading, and vectorized prediction for full-chromosome runs. Integrates with the existing pipeline via config and CLI.
+- **New config field:** `method` now supports `"voting"`, `"parsimony"`, and `"ml"`. For `method: ml`, optional `model_path` points to a trained LightGBM model (or uses a bundled default when available).
+- **CLI and config** updated to pass method selection and ML options through to the calling phase.
+- **Documentation:** algorithm page and configuration reference updated for the ML method; GPU logo and conf tweaks.
+- **Tests:** `tests/test_ml.py` for feature extraction, prediction shape, and integration.
+- **Lock file:** `uv.lock` added for reproducible installs.
+
 ## 1.2.0 (2026)
 
 Fitch parsimony for tree-based ancestral inference.
