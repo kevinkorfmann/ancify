@@ -492,26 +492,205 @@ Assemblies marked with **†** are not part of the core UCSC Genome Browser but 
 ### Generating your own alignments
 
 For species not covered by UCSC's pre-computed pairwise alignments, you can
-produce `net.axt.gz` files from any pair of genome assemblies:
+produce `net.axt.gz` files from any pair of genome assemblies. This section
+walks through the full process using **Brassica rapa** as a concrete example.
+
+#### Prerequisites
+
+You need two command-line toolkits:
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| [lastz](https://lastz.github.io/lastz/) | Pairwise genome alignment | `conda install -c bioconda lastz` or build from source |
+| [UCSC Kent utilities](https://hgdownload.soe.ucsc.edu/admin/exe/) | Chaining, netting, format conversion | Download pre-compiled binaries for your platform |
+
+The specific Kent utilities you need are: `faToTwoBit`, `twoBitInfo`,
+`axtChain`, `chainSort`, `chainNet`, `netToAxt`, and `axtSort`.
 
 ```bash
-# 1. Run lastz pairwise alignment
+# Example: download Kent tools on Linux x86_64
+KENT=https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64
+for tool in faToTwoBit twoBitInfo axtChain chainSort chainNet netToAxt axtSort; do
+    wget -q "$KENT/$tool" -O "$tool" && chmod +x "$tool"
+done
+export PATH="$PWD:$PATH"
+```
+
+#### Step 1: Obtain genome assemblies
+
+Download FASTA files for your focal species and each outgroup. For Brassica
+rapa the genomes are available from Ensembl Plants (or NCBI/Phytozome):
+
+```bash
+# Focal: Brassica rapa v1.0
+wget https://ftp.ensemblgenomes.org/pub/plants/release-57/fasta/brassica_rapa/dna/Brassica_rapa.Brapa_1.0.dna.toplevel.fa.gz
+gunzip Brassica_rapa.Brapa_1.0.dna.toplevel.fa.gz
+mv Brassica_rapa.Brapa_1.0.dna.toplevel.fa braRap1.fa
+
+# Inner outgroup: Brassica oleracea (same genus, ~4 Mya)
+wget https://ftp.ensemblgenomes.org/pub/plants/release-57/fasta/brassica_oleracea/dna/Brassica_oleracea.BOL.dna.toplevel.fa.gz
+gunzip Brassica_oleracea.BOL.dna.toplevel.fa.gz
+mv Brassica_oleracea.BOL.dna.toplevel.fa braOle1.fa
+
+# Outer outgroup: Arabidopsis thaliana (~20 Mya, same family Brassicaceae)
+wget https://ftp.ensemblgenomes.org/pub/plants/release-57/fasta/arabidopsis_thaliana/dna/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
+gunzip Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.gz
+mv Arabidopsis_thaliana.TAIR10.dna.toplevel.fa araTha1.fa
+```
+
+#### Step 2: Convert to 2bit format
+
+lastz and the Kent chaining tools require `.2bit` format:
+
+```bash
+faToTwoBit braRap1.fa braRap1.2bit
+faToTwoBit braOle1.fa braOle1.2bit
+faToTwoBit araTha1.fa araTha1.2bit
+
+# Generate chromosome sizes (needed for chaining/netting)
+twoBitInfo braRap1.2bit braRap1.chrom.sizes
+twoBitInfo braOle1.2bit braOle1.chrom.sizes
+twoBitInfo araTha1.2bit araTha1.chrom.sizes
+```
+
+You also need the ancify chromosome lengths file (tab-separated name + length):
+
+```bash
+cp braRap1.chrom.sizes braRap1.chromLens.txt
+```
+
+#### Step 3: Run lastz pairwise alignment
+
+Run lastz once for each outgroup. The target is always your focal species:
+
+```bash
+# B. rapa vs B. oleracea (inner outgroup)
+lastz braRap1.2bit braOle1.2bit \
+    --format=axt \
+    --ambiguous=iupac \
+    > braRap1_braOle1_raw.axt
+
+# B. rapa vs A. thaliana (outer outgroup)
+lastz braRap1.2bit araTha1.2bit \
+    --format=axt \
+    --ambiguous=iupac \
+    > braRap1_araTha1_raw.axt
+```
+
+:::{tip}
+For large genomes, lastz can take many hours. Speed it up with
+`--step=20 --seed=match12` for a coarser but faster initial search, or
+split chromosomes into separate jobs and run in parallel. See the
+[lastz documentation](https://lastz.github.io/lastz/) for all tuning flags.
+:::
+
+#### Step 4: Chain and net the alignment
+
+Chaining groups co-linear alignment blocks; netting selects the single best
+chain at each target position (removing tandem-duplication noise):
+
+```bash
+# --- B. rapa vs B. oleracea ---
+axtChain braRap1_braOle1_raw.axt braRap1.2bit braOle1.2bit braOle1.chain
+chainSort braOle1.chain braOle1.sorted.chain
+chainNet braOle1.sorted.chain braRap1.chrom.sizes braOle1.chrom.sizes \
+    braOle1_target.net braOle1_query.net
+netToAxt braOle1_target.net braOle1.sorted.chain braRap1.2bit braOle1.2bit stdout \
+    | axtSort stdin braRap1.braOleracea.net.axt
+
+# --- B. rapa vs A. thaliana ---
+axtChain braRap1_araTha1_raw.axt braRap1.2bit araTha1.2bit araTha1.chain
+chainSort araTha1.chain araTha1.sorted.chain
+chainNet araTha1.sorted.chain braRap1.chrom.sizes araTha1.chrom.sizes \
+    araTha1_target.net araTha1_query.net
+netToAxt araTha1_target.net araTha1.sorted.chain braRap1.2bit araTha1.2bit stdout \
+    | axtSort stdin braRap1.araTha1.net.axt
+```
+
+#### Step 5: Compress and verify
+
+```bash
+gzip braRap1.braOleracea.net.axt
+gzip braRap1.araTha1.net.axt
+
+# Quick sanity check: each file should contain alignment blocks
+zcat braRap1.braOleracea.net.axt.gz | head -20
+```
+
+#### Step 6: Run ancify
+
+The resulting files plug straight into an ancify config:
+
+```yaml
+focal_species: brassica_rapa
+chromosome_lengths: braRap1.chromLens.txt
+
+outgroups:
+  inner:
+    - name: brassica_oleracea
+      alignment: braRap1.braOleracea.net.axt.gz
+  outer:
+    - name: arabidopsis_thaliana
+      alignment: braRap1.araTha1.net.axt.gz
+
+output_dir: ./brassica_rapa_ancestral
+num_cpus: 4
+```
+
+```bash
+ancify run -c brassica_rapa_config.yaml
+```
+
+The repo also includes a ready-made runner script at
+`scripts/examples/brassica_rapa/run.sh` (single-chromosome test on A01).
+
+#### Quick-reference: generic pipeline
+
+For any species pair, the minimal pipeline is:
+
+```bash
+# 1. Convert FASTA to 2bit
+faToTwoBit target.fa target.2bit
+faToTwoBit query.fa query.2bit
+twoBitInfo target.2bit target.chrom.sizes
+twoBitInfo query.2bit query.chrom.sizes
+
+# 2. Align
 lastz target.2bit query.2bit \
     --format=axt --ambiguous=iupac \
     > raw.axt
 
-# 2. Chain and net the alignment (UCSC Kent tools)
+# 3. Chain and net
 axtChain raw.axt target.2bit query.2bit chain.txt
 chainSort chain.txt sorted.chain
 chainNet sorted.chain target.chrom.sizes query.chrom.sizes target.net query.net
 netToAxt target.net sorted.chain target.2bit query.2bit stdout \
     | axtSort stdin net.axt
 
-# 3. Compress
+# 4. Compress
 gzip net.axt
 ```
 
-The resulting `net.axt.gz` can be used directly as an alignment file in your
-ancify config. See the [lastz documentation](https://lastz.github.io/lastz/)
-and the [UCSC Kent utilities](https://hgdownload.soe.ucsc.edu/admin/exe/) for
-installation and detailed options.
+#### Notes on plant genomes
+
+- **Whole-genome duplications** are common in plants (Brassica underwent a
+  lineage-specific triplication). The netting step handles this by picking
+  the single best chain per target position, but expect lower alignment
+  coverage and more fragmented blocks than mammalian comparisons.
+- **Chromosome naming** varies widely (A01-A10 in B. rapa, Chr1-Chr5 in
+  Arabidopsis). ancify does not assume a `chr` prefix — any naming works.
+  Omit the `chromosomes` key in your config to process every entry in the
+  lengths file.
+- **Alignment coverage** for the outer outgroup (Arabidopsis, ~20 Mya) will
+  be substantially lower than the inner outgroup (B. oleracea, ~4 Mya).
+  This is normal and means more positions will receive low-confidence
+  (lowercase) calls rather than high-confidence ones.
+- If the Ensembl FASTA contains scaffold/contig names you do not want, filter
+  your chromosome lengths file first:
+
+  ```bash
+  grep -E '^A[0-9]+' braRap1.chrom.sizes > braRap1.chromLens.txt
+  ```
+
+For more details see the [lastz documentation](https://lastz.github.io/lastz/)
+and the [UCSC Kent utilities](https://hgdownload.soe.ucsc.edu/admin/exe/).
