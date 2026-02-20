@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# Benchmark voting run-time: CPU vs GPU across human chromosomes.
+# Benchmark CPU vs GPU across human chromosomes.
 #
 # Uses the full 4-outgroup configuration (bonobo, chimp, gorilla,
 # macaque) so the GPU has enough work to demonstrate acceleration.
-# With only 2 outgroups the per-position compute is too trivial
-# for GPU kernel launch overhead to pay off.
+#
+# Supports voting (default), parsimony, and likelihood methods.
 #
 # Timing is stratified by phase:
 #   Phase 1 = projection (AXT → projected FASTA)
-#   Phase 2 = ancestral calling (voting)
+#   Phase 2 = ancestral calling
 #
 # Env:
+#   METHOD       voting (default), parsimony, likelihood
 #   CHROMOSOMES  space-separated list
 #                (default: chr1 chr2 … chr22 chrX)
 #   WORK_DIR     working directory (default: repo/ancify_voting_bench)
@@ -19,14 +20,16 @@
 #   SKIP_PLOT    set to 1 to skip plotting (e.g. if no matplotlib)
 #
 # Usage:
-#   ./scripts/benchmark_voting_cpu_gpu.sh          # all chromosomes
-#   CHROMOSOMES="chr1" ./scripts/benchmark_voting_cpu_gpu.sh
+#   ./scripts/benchmark_voting_cpu_gpu.sh                     # voting, all chr
+#   METHOD=parsimony CHROMOSOMES="chr1" ./scripts/benchmark_voting_cpu_gpu.sh
+#   METHOD=likelihood CHROMOSOMES="chr22" ./scripts/benchmark_voting_cpu_gpu.sh
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+METHOD="${METHOD:-voting}"
 if [[ -z "${CHROMOSOMES:-}" ]]; then
   CHROMOSOMES="$(printf 'chr%s ' {1..22})chrX"
 fi
@@ -36,13 +39,17 @@ SKIP_PLOT="${SKIP_PLOT:-0}"
 
 BASE_URL="https://hgdownload.soe.ucsc.edu/goldenPath/hg38"
 
+TREE_PARSIMONY='(((bonobo,chimp),gorilla),macaque)'
+TREE_LIKELIHOOD='(((bonobo:0.008,chimp:0.008):0.002,gorilla:0.009):0.020,macaque:0.038)'
+
 N_CHROMS=$(echo $CHROMOSOMES | wc -w)
-TIMINGS_CSV="$WORK_DIR/voting_timings.csv"
-PLOT_PATH="$WORK_DIR/voting_cpu_vs_gpu.png"
+TIMINGS_CSV="$WORK_DIR/${METHOD}_timings.csv"
+PLOT_PATH="$WORK_DIR/${METHOD}_cpu_vs_gpu.png"
 
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  Voting benchmark: CPU vs GPU (human hg38, 4 outgroups) ║"
-echo "║  Phases: 1 (projection) + 2 (voting)                   ║"
+echo "║  Benchmark: CPU vs GPU (human hg38, 4 outgroups)        ║"
+echo "║  Method:      $METHOD"
+echo "║  Phases: 1 (projection) + 2 ($METHOD)"
 echo "║  Chromosomes: $N_CHROMS  ($(echo $CHROMOSOMES | cut -d' ' -f1) … $(echo $CHROMOSOMES | awk '{print $NF}'))"
 echo "║  CPUs:        $ANCIFY_CPUS"
 echo "║  Work dir:    $WORK_DIR"
@@ -82,7 +89,6 @@ echo "chromosome,backend,phase1_sec,phase2_sec,time_sec" > "$TIMINGS_CSV"
 DONE=0
 FAILED=0
 for CHROM in $CHROMOSOMES; do
-  # Write per-chromosome config with all 4 outgroups
   awk -v c="$CHROM" '$1 == c' hg38.chrom.sizes > "$WORK_DIR/chromoLens_${CHROM}.txt"
   if [[ ! -s "$WORK_DIR/chromoLens_${CHROM}.txt" ]]; then
     echo "WARNING: $CHROM not found in hg38.chrom.sizes — skipping"
@@ -90,8 +96,8 @@ for CHROM in $CHROMOSOMES; do
   fi
 
   for BACKEND in cpu gpu; do
-    OUT_DIR="$WORK_DIR/output_${CHROM}/voting"
-    CONFIG="$WORK_DIR/config_${CHROM}_voting.yaml"
+    OUT_DIR="$WORK_DIR/output_${CHROM}/${METHOD}"
+    CONFIG="$WORK_DIR/config_${CHROM}_${METHOD}.yaml"
 
     cat > "$CONFIG" <<EOF
 focal_species: human
@@ -112,12 +118,24 @@ outgroups:
 work_dir: $WORK_DIR
 output_dir: $OUT_DIR
 num_cpus: $ANCIFY_CPUS
-method: voting
+method: $METHOD
 backend: $BACKEND
 EOF
 
+    # Add method-specific config
+    case "$METHOD" in
+      parsimony)
+        echo "tree: \"$TREE_PARSIMONY\"" >> "$CONFIG"
+        ;;
+      likelihood)
+        echo "tree: \"$TREE_LIKELIHOOD\"" >> "$CONFIG"
+        echo "substitution_model: HKY85" >> "$CONFIG"
+        echo "model_kappa: 2.0" >> "$CONFIG"
+        ;;
+    esac
+
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  [$((DONE/2 + 1))/$N_CHROMS]  $CHROM  —  $BACKEND  (4 outgroups)"
+    echo "  [$((DONE/2 + 1))/$N_CHROMS]  $CHROM  —  $BACKEND  ($METHOD, 4 outgroups)"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     cd "$REPO_DIR"
@@ -140,7 +158,7 @@ done
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  Benchmark complete                                     ║"
+echo "║  Benchmark complete ($METHOD)                           "
 echo "║  Successful: $DONE / $((N_CHROMS * 2))  runs"
 if [[ $FAILED -gt 0 ]]; then
 echo "║  Failed:     $FAILED"

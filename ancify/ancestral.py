@@ -24,7 +24,12 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from .utils import read_fasta, write_fasta, majority_vote, VALID_ALLELES
-from .backend import vectorized_ancestral_call, get_available_gpus
+from .backend import (
+    vectorized_ancestral_call,
+    vectorized_fitch_call,
+    vectorized_likelihood_call,
+    get_available_gpus,
+)
 from .parsimony import (
     VALID_BASES,
     fitch_ancestral,
@@ -178,6 +183,73 @@ def _call_chromosome_parsimony(args):
     return chrom
 
 
+def _call_chromosome_parsimony_vectorized(args):
+    """Vectorized worker: Fitch parsimony for one chromosome (CPU or GPU)."""
+    chrom, species_paths, tree_text, out_path, device_str = args
+
+    device = None
+    if device_str is not None:
+        import torch
+        device = torch.device(device_str)
+
+    tree = parse_newick(tree_text)
+    species_seqs = {}
+    length = None
+    for name, path in species_paths.items():
+        _, seq = read_fasta(path)
+        species_seqs[name] = seq
+        if length is None:
+            length = len(seq)
+        elif len(seq) != length:
+            raise ValueError(
+                f"Length mismatch on {chrom}: expected {length}, got {len(seq)}"
+            )
+
+    anc = vectorized_fitch_call(species_seqs, tree, device)
+    write_fasta(out_path, f">{chrom}", anc)
+    return chrom
+
+
+def _call_chromosome_likelihood_vectorized(args):
+    """Vectorized worker: Felsenstein likelihood for one chromosome (CPU or GPU)."""
+    (
+        chrom, species_paths, tree_text,
+        model_name, model_kappa, model_base_freqs, model_rates,
+        high_thresh, low_thresh, out_path, device_str,
+    ) = args
+
+    device = None
+    if device_str is not None:
+        import torch
+        device = torch.device(device_str)
+
+    from .likelihood import build_model
+
+    tree = parse_newick(tree_text)
+    model = build_model(
+        model_name, kappa=model_kappa,
+        base_freqs=model_base_freqs, rates=model_rates,
+    )
+
+    species_seqs = {}
+    length = None
+    for name, path in species_paths.items():
+        _, seq = read_fasta(path)
+        species_seqs[name] = seq
+        if length is None:
+            length = len(seq)
+        elif len(seq) != length:
+            raise ValueError(
+                f"Length mismatch on {chrom}: expected {length}, got {len(seq)}"
+            )
+
+    anc = vectorized_likelihood_call(
+        species_seqs, tree, model, high_thresh, low_thresh, device,
+    )
+    write_fasta(out_path, f">{chrom}", anc)
+    return chrom
+
+
 def run_ancestral_calling(config):
     """Execute Phase 2: call ancestral alleles for every chromosome.
 
@@ -207,23 +279,54 @@ def _run_parsimony(config):
 
     all_outgroups = config.outgroups_inner + config.outgroups_outer
 
+    backend_mode = getattr(config, "backend", "auto")
+    gpu_device_ids = getattr(config, "gpu_devices", None)
+
+    use_gpu = False
+    devices = []
+
+    if backend_mode in ("auto", "gpu"):
+        gpus = get_available_gpus()
+        if gpu_device_ids is not None:
+            gpus = [g for g in gpus if g in gpu_device_ids]
+        if gpus:
+            import torch
+            devices = [torch.device(f"cuda:{i}") for i in gpus]
+            use_gpu = True
+
+    if backend_mode == "gpu" and not use_gpu:
+        logger.warning(
+            "GPU backend requested but no CUDA devices available; "
+            "falling back to CPU vectorised path"
+        )
+
     tasks = []
-    for chrom in chromosomes:
+    for i, chrom in enumerate(chromosomes):
         species_paths = {
             og.name: str(work / "projected" / og.name / f"{chrom}.fa")
             for og in all_outgroups
         }
         out_path = str(out_dir / f"{chrom}.fa")
-        tasks.append((chrom, species_paths, config.tree, out_path))
+        device_str = str(devices[i % len(devices)]) if use_gpu else None
+        tasks.append((chrom, species_paths, config.tree, out_path, device_str))
 
+    label = f"gpu ({len(devices)} device(s))" if use_gpu else "cpu"
     logger.info(
-        "Phase 2: calling ancestral states for %d chromosomes [parsimony]",
-        len(tasks),
+        "Phase 2: calling ancestral states for %d chromosomes [parsimony, %s]",
+        len(tasks), label,
     )
 
-    with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
+    if use_gpu:
+        max_workers = min(len(tasks), len(devices) * 2) or 1
+        pool_cls = ThreadPoolExecutor
+    else:
+        max_workers = config.num_cpus
+        pool_cls = ProcessPoolExecutor
+
+    with pool_cls(max_workers=max_workers) as pool:
         futures = {
-            pool.submit(_call_chromosome_parsimony, t): t for t in tasks
+            pool.submit(_call_chromosome_parsimony_vectorized, t): t
+            for t in tasks
         }
         for future in as_completed(futures):
             chrom = future.result()
@@ -243,29 +346,61 @@ def _run_likelihood(config):
 
     all_outgroups = config.outgroups_inner + config.outgroups_outer
 
+    backend_mode = getattr(config, "backend", "auto")
+    gpu_device_ids = getattr(config, "gpu_devices", None)
+
+    use_gpu = False
+    devices = []
+
+    if backend_mode in ("auto", "gpu"):
+        gpus = get_available_gpus()
+        if gpu_device_ids is not None:
+            gpus = [g for g in gpus if g in gpu_device_ids]
+        if gpus:
+            import torch
+            devices = [torch.device(f"cuda:{i}") for i in gpus]
+            use_gpu = True
+
+    if backend_mode == "gpu" and not use_gpu:
+        logger.warning(
+            "GPU backend requested but no CUDA devices available; "
+            "falling back to CPU vectorised path"
+        )
+
     tasks = []
-    for chrom in chromosomes:
+    for i, chrom in enumerate(chromosomes):
         species_paths = {
             og.name: str(work / "projected" / og.name / f"{chrom}.fa")
             for og in all_outgroups
         }
         out_path = str(out_dir / f"{chrom}.fa")
+        device_str = str(devices[i % len(devices)]) if use_gpu else None
         tasks.append((
             chrom, species_paths, config.tree,
             config.substitution_model, config.model_kappa,
             config.model_base_freqs, config.model_rates,
             config.likelihood_high_threshold, config.likelihood_low_threshold,
-            out_path,
+            out_path, device_str,
         ))
 
+    label = f"gpu ({len(devices)} device(s))" if use_gpu else "cpu"
     logger.info(
-        "Phase 2: calling ancestral states for %d chromosomes [likelihood]",
-        len(tasks),
+        "Phase 2: calling ancestral states for %d chromosomes [likelihood, %s]",
+        len(tasks), label,
     )
 
-    with ProcessPoolExecutor(max_workers=config.num_cpus) as pool:
+    if use_gpu:
+        max_workers = min(len(tasks), len(devices) * 2) or 1
+        pool_cls = ThreadPoolExecutor
+        worker = _call_chromosome_likelihood_vectorized
+    else:
+        max_workers = config.num_cpus
+        pool_cls = ProcessPoolExecutor
+        worker = _call_chromosome_likelihood_vectorized
+
+    with pool_cls(max_workers=max_workers) as pool:
         futures = {
-            pool.submit(_call_chromosome_likelihood, t): t for t in tasks
+            pool.submit(worker, t): t for t in tasks
         }
         for future in as_completed(futures):
             chrom = future.result()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot voting benchmark: CPU vs GPU per chromosome.
+"""Plot benchmark: CPU vs GPU per chromosome.
 
 Reads a CSV with columns:
     chromosome, backend, phase1_sec, phase2_sec, time_sec
@@ -7,6 +7,9 @@ Reads a CSV with columns:
 Produces a multi-panel figure:
   - Top:    stacked bar chart (Phase 1 + Phase 2) per chromosome
   - Bottom: Phase 2 speedup (CPU / GPU) with summary statistics
+
+Infers the method name from the CSV filename (e.g. ``voting_timings.csv``
+→ "voting", ``likelihood_timings.csv`` → "likelihood").
 
 Usage:
     python scripts/plot_voting_benchmark.py <timings.csv> <output.png>
@@ -94,6 +97,9 @@ def main():
     C_SPEEDUP = "#7c3aed"  # purple
     C_GRID = "#e5e7eb"
 
+    # ── Infer method name from CSV filename ────────────────
+    method = csv_path.stem.replace("_timings", "").replace("_", " ").title()
+
     # ── Figure layout ────────────────────────────────────────
     fig_w = max(12, n * 0.6)
     fig, (ax_bars, ax_speed) = plt.subplots(
@@ -137,7 +143,7 @@ def main():
                             fontsize=9)
     ax_bars.set_xlabel("")
     ax_bars.set_xlim(-0.6, n - 0.4)
-    ax_bars.set_title("Run-time by chromosome — CPU vs GPU  (4 outgroups, Phase 1 + Phase 2 stacked)",
+    ax_bars.set_title(f"{method} — CPU vs GPU  (4 outgroups, Phase 1 + Phase 2 stacked)",
                       fontsize=13, fontweight="bold", pad=12)
 
     ax_bars.spines["top"].set_visible(False)

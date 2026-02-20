@@ -364,6 +364,209 @@ class TestVectorizedAncestralCallGPU:
                 assert gpu == scalar, f"min_i={min_i}, min_o={min_o}"
 
 
+# ── vectorized_fitch_call (CPU) ───────────────────────────────────────────
+
+class TestVectorizedFitchCPU:
+
+    @staticmethod
+    def _scalar_fitch(species_seqs, tree):
+        from ancify.ancestral import call_ancestral_base_parsimony
+        length = len(next(iter(species_seqs.values())))
+        out = []
+        for i in range(length):
+            bases = {name: seq[i].upper() for name, seq in species_seqs.items()}
+            out.append(call_ancestral_base_parsimony(tree, bases))
+        return "".join(out)
+
+    def test_all_agree_uppercase(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        tree = parse_newick("((A,B),C)")
+        seqs = {"A": "ACGT", "B": "ACGT", "C": "ACGT"}
+        assert vectorized_fitch_call(seqs, tree) == "ACGT"
+
+    def test_all_missing(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        tree = parse_newick("((A,B),C)")
+        seqs = {"A": "NNNN", "B": "NNNN", "C": "NNNN"}
+        assert vectorized_fitch_call(seqs, tree) == "NNNN"
+
+    def test_disagreement_ambiguous(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        tree = parse_newick("(A,B)")
+        seqs = {"A": "A", "B": "C"}
+        result = vectorized_fitch_call(seqs, tree)
+        assert result == "a"
+
+    def test_random_matches_scalar(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        rng = np.random.RandomState(42)
+        bases = list("ACGTN")
+        tree = parse_newick("(((A,B),C),D)")
+        length = 500
+        for _ in range(5):
+            seqs = {
+                name: "".join(rng.choice(bases, size=length))
+                for name in ["A", "B", "C", "D"]
+            }
+            vec = vectorized_fitch_call(seqs, tree)
+            scalar = self._scalar_fitch(seqs, tree)
+            assert vec == scalar
+
+
+@pytest.mark.skipif(not _HAS_GPU, reason="No CUDA GPU available")
+class TestVectorizedFitchGPU:
+
+    @staticmethod
+    def _scalar_fitch(species_seqs, tree):
+        from ancify.ancestral import call_ancestral_base_parsimony
+        length = len(next(iter(species_seqs.values())))
+        out = []
+        for i in range(length):
+            bases = {name: seq[i].upper() for name, seq in species_seqs.items()}
+            out.append(call_ancestral_base_parsimony(tree, bases))
+        return "".join(out)
+
+    def test_matches_cpu(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        rng = np.random.RandomState(88)
+        bases = list("ACGTN")
+        tree = parse_newick("(((A,B),C),D)")
+        length = 2000
+        seqs = {
+            name: "".join(rng.choice(bases, size=length))
+            for name in ["A", "B", "C", "D"]
+        }
+        cpu = vectorized_fitch_call(seqs, tree, device=None)
+        gpu = vectorized_fitch_call(seqs, tree, device=_gpu_device())
+        assert cpu == gpu
+
+    def test_matches_scalar(self):
+        from ancify.backend import vectorized_fitch_call
+        from ancify.parsimony import parse_newick
+        rng = np.random.RandomState(99)
+        bases = list("ACGTN")
+        tree = parse_newick("(((A,B),C),D)")
+        length = 1000
+        seqs = {
+            name: "".join(rng.choice(bases, size=length))
+            for name in ["A", "B", "C", "D"]
+        }
+        gpu = vectorized_fitch_call(seqs, tree, device=_gpu_device())
+        scalar = self._scalar_fitch(seqs, tree)
+        assert gpu == scalar
+
+
+# ── vectorized_likelihood_call (CPU) ─────────────────────────────────────
+
+class TestVectorizedLikelihoodCPU:
+
+    @staticmethod
+    def _scalar_likelihood(species_seqs, tree, model, high_thresh, low_thresh):
+        from ancify.likelihood import call_ancestral_base_likelihood, _build_P_cache
+        length = len(next(iter(species_seqs.values())))
+        P_cache = _build_P_cache(tree, model)
+        out = []
+        for i in range(length):
+            bases = {name: seq[i].upper() for name, seq in species_seqs.items()}
+            out.append(call_ancestral_base_likelihood(
+                tree, bases, model, high_thresh, low_thresh, _P_cache=P_cache,
+            ))
+        return "".join(out)
+
+    def test_all_agree(self):
+        from ancify.backend import vectorized_likelihood_call
+        from ancify.parsimony import parse_newick
+        from ancify.likelihood import build_model
+        tree = parse_newick("(A:0.01,B:0.01)")
+        model = build_model("JC69")
+        seqs = {"A": "ACGT", "B": "ACGT"}
+        result = vectorized_likelihood_call(seqs, tree, model)
+        assert result == "ACGT"
+
+    def test_all_missing(self):
+        from ancify.backend import vectorized_likelihood_call
+        from ancify.parsimony import parse_newick
+        from ancify.likelihood import build_model
+        tree = parse_newick("(A:0.01,B:0.01)")
+        model = build_model("JC69")
+        seqs = {"A": "NNNN", "B": "NNNN"}
+        assert vectorized_likelihood_call(seqs, tree, model) == "NNNN"
+
+    def test_random_matches_scalar(self):
+        from ancify.backend import vectorized_likelihood_call
+        from ancify.parsimony import parse_newick
+        from ancify.likelihood import build_model
+        rng = np.random.RandomState(42)
+        bases = list("ACGTN")
+        tree = parse_newick("((A:0.008,B:0.008):0.002,C:0.038)")
+        model = build_model("HKY85", kappa=2.0)
+        length = 500
+        for _ in range(3):
+            seqs = {
+                name: "".join(rng.choice(bases, size=length))
+                for name in ["A", "B", "C"]
+            }
+            vec = vectorized_likelihood_call(seqs, tree, model)
+            scalar = self._scalar_likelihood(seqs, tree, model, 0.8, 0.5)
+            assert vec == scalar
+
+
+@pytest.mark.skipif(not _HAS_GPU, reason="No CUDA GPU available")
+class TestVectorizedLikelihoodGPU:
+
+    @staticmethod
+    def _scalar_likelihood(species_seqs, tree, model, high_thresh, low_thresh):
+        from ancify.likelihood import call_ancestral_base_likelihood, _build_P_cache
+        length = len(next(iter(species_seqs.values())))
+        P_cache = _build_P_cache(tree, model)
+        out = []
+        for i in range(length):
+            bases = {name: seq[i].upper() for name, seq in species_seqs.items()}
+            out.append(call_ancestral_base_likelihood(
+                tree, bases, model, high_thresh, low_thresh, _P_cache=P_cache,
+            ))
+        return "".join(out)
+
+    def test_matches_cpu(self):
+        from ancify.backend import vectorized_likelihood_call
+        from ancify.parsimony import parse_newick
+        from ancify.likelihood import build_model
+        rng = np.random.RandomState(88)
+        bases = list("ACGTN")
+        tree = parse_newick("((A:0.008,B:0.008):0.002,C:0.038)")
+        model = build_model("HKY85", kappa=2.0)
+        length = 2000
+        seqs = {
+            name: "".join(rng.choice(bases, size=length))
+            for name in ["A", "B", "C"]
+        }
+        cpu = vectorized_likelihood_call(seqs, tree, model, device=None)
+        gpu = vectorized_likelihood_call(seqs, tree, model, device=_gpu_device())
+        assert cpu == gpu
+
+    def test_matches_scalar(self):
+        from ancify.backend import vectorized_likelihood_call
+        from ancify.parsimony import parse_newick
+        from ancify.likelihood import build_model
+        rng = np.random.RandomState(99)
+        bases = list("ACGTN")
+        tree = parse_newick("(((A:0.008,B:0.008):0.002,C:0.009):0.02,D:0.038)")
+        model = build_model("HKY85", kappa=2.0)
+        length = 1000
+        seqs = {
+            name: "".join(rng.choice(bases, size=length))
+            for name in ["A", "B", "C", "D"]
+        }
+        gpu = vectorized_likelihood_call(seqs, tree, model, device=_gpu_device())
+        scalar = self._scalar_likelihood(seqs, tree, model, 0.8, 0.5)
+        assert gpu == scalar
+
+
 # ── Backend detection (smoke tests) ─────────────────────────────────────
 
 class TestBackendDetection:
