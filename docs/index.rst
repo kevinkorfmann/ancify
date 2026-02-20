@@ -1,10 +1,6 @@
-ancify — decode the root
-=========================
+ancify - A fast and flexible pipeline for ancestral allele polarization
+=========================================================================
 
-.. container:: epigraph
-
-   Was einst im tiefen Schweigen schlief,
-   ist nun ein fernes Echo seiner selbst.
 
 **Ancestral allele polarization for any species.**
 
