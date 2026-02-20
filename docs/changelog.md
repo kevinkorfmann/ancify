@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0 (2026)
+
+Documentation: tutorials for ancestral FASTAs and VCF polarization, plus a species catalogue.
+
+### Documentation
+
+- **Tutorials.** New **Tutorial 4: Getting Ancestral FASTA Files** — how to locate, verify, and read per-chromosome output; sanity checks; loading all chromosomes; confidence encoding recap. New **Tutorial 5: Polarizing VCF Variants** — annotating REF/ALT as ancestral/derived with cyvcf2 and scikit-allel, a complete `polarize_vcf.py` script (AA/DAF INFO fields), unfolded SFS example, and tips on confidence filtering.
+- **Species guide.** New **Species catalogue** with 115 commonly studied species: suggested inner and outer outgroups, UCSC assembly identifiers, and approximate divergence times. Grouped by clade (primates, rodents, carnivores, ungulates, birds, fish, Drosophila, plants, fungi, etc.). Includes a short section on generating your own net AXT alignments with lastz when UCSC data is unavailable.
+
+---
+
 ## 1.4.0 (2026)
 
 Likelihood-based ancestral reconstruction and expanded installation docs.
