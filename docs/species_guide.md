@@ -307,7 +307,7 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 | 11 | *Nasalis larvatus* | Proboscis monkey | nasLar1 | Green monkey, rhesus macaque | Human | 10 / 25 Mya |
 | 12 | *Callithrix jacchus* | Marmoset | calJac4 | Squirrel monkey | Macaque | 15 / 40 Mya |
 | 13 | *Saimiri boliviensis* | Squirrel monkey | saiBol1 | Marmoset | Macaque | 15 / 40 Mya |
-| 14 | *Carlito syrichta* | Tarsier | tarSyr2 | Mouse lemur, bushbaby | Human | 58–70 / 75 Mya |
+| 14 | *Carlito syrichta* | Tarsier | tarSyr2 | Human, macaque | Mouse lemur, bushbaby | 58 / 64 Mya |
 | 15 | *Microcebus murinus* | Mouse lemur | micMur2 | Bushbaby | Marmoset | 58 / 70 Mya |
 | 16 | *Otolemur garnettii* | Bushbaby | otoGar3 | Mouse lemur | Marmoset | 58 / 70 Mya |
 
@@ -379,9 +379,9 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 
 | # | Focal species | Common name | Assembly | Suggested inner outgroups | Suggested outer outgroup | Div. (inner / outer) |
 |---|---------------|-------------|----------|---------------------------|--------------------------|----------------------|
-| 51 | *Monodelphis domestica* | Opossum | monDom5 | Tasmanian devil | Wallaby | 70 / 80 Mya |
-| 52 | *Sarcophilus harrisii* | Tasmanian devil | sarHar1 | Wallaby | Opossum | 40 / 80 Mya |
-| 53 | *Macropus eugenii* | Wallaby | macEug2 | Tasmanian devil | Opossum | 40 / 80 Mya |
+| 51 | *Monodelphis domestica* | Opossum | monDom5 | Tasmanian devil, wallaby | Platypus | 69 / 190 Mya |
+| 52 | *Sarcophilus harrisii* | Tasmanian devil | sarHar1 | Wallaby | Opossum | 62 / 69 Mya |
+| 53 | *Macropus eugenii* | Wallaby | macEug2 | Tasmanian devil | Opossum | 62 / 69 Mya |
 | 54 | *Ornithorhynchus anatinus* | Platypus | ornAna2 | Opossum | Chicken | 190 / 320 Mya |
 
 ### Birds
@@ -404,11 +404,11 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 
 | # | Focal species | Common name | Assembly | Suggested inner outgroups | Suggested outer outgroup | Div. (inner / outer) |
 |---|---------------|-------------|----------|---------------------------|--------------------------|----------------------|
-| 66 | *Anolis carolinensis* | Green anole | anoCar2 | Garter snake | Painted turtle | 150 / 250 Mya |
-| 67 | *Chrysemys picta* | Painted turtle | chrPic2 | Softshell turtle, alligator | Green anole | 70–160 / 250 Mya |
-| 68 | *Pelodiscus sinensis* | Chinese softshell turtle | pelSin2 | Painted turtle, alligator | Green anole | 70–160 / 250 Mya |
-| 69 | *Alligator mississippiensis* | American alligator | allMis1 | Painted turtle, softshell turtle | Green anole | 160 / 250 Mya |
-| 70 | *Thamnophis sirtalis* | Garter snake | thaSir1 | Green anole | Painted turtle | 150 / 250 Mya |
+| 66 | *Anolis carolinensis* | Green anole | anoCar2 | Garter snake | Painted turtle | 150 / 275 Mya |
+| 67 | *Chrysemys picta* | Painted turtle | chrPic2 | Softshell turtle | Alligator | 70 / 255 Mya |
+| 68 | *Pelodiscus sinensis* | Chinese softshell turtle | pelSin2 | Painted turtle | Alligator | 70 / 255 Mya |
+| 69 | *Alligator mississippiensis* | American alligator | allMis1 | Painted turtle, softshell turtle | Green anole | 255 / 275 Mya |
+| 70 | *Thamnophis sirtalis* | Garter snake | thaSir1 | Green anole | Painted turtle | 150 / 275 Mya |
 | 71 | *Xenopus tropicalis* | Western clawed frog | xenTro10 | *X. laevis* | Coelacanth | 50 / 370 Mya |
 | 72 | *Xenopus laevis* | African clawed frog | xenLae2 | *X. tropicalis* | Coelacanth | 50 / 370 Mya |
 | 73 | *Rana temporaria* | Common frog | — | *Xenopus* spp. | Coelacanth | 200 / 370 Mya |
@@ -426,10 +426,10 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 | 80 | *Gadus morhua* | Atlantic cod | gadMor1 | Stickleback, medaka | Zebrafish | 100–110 / 150 Mya |
 | 81 | *Salmo salar* | Atlantic salmon | — | Rainbow trout | Zebrafish | 25 / 200 Mya |
 | 82 | *Oncorhynchus mykiss* | Rainbow trout | — | Atlantic salmon | Zebrafish | 25 / 200 Mya |
-| 83 | *Latimeria chalumnae* | Coelacanth | latCha1 | Spotted gar | *Xenopus* | 400 / 420 Mya |
-| 84 | *Lepisosteus oculatus* | Spotted gar | lepOcu1 | Zebrafish | Coelacanth | 300 / 420 Mya |
-| 85 | *Petromyzon marinus* | Sea lamprey | petMar3 | Elephant shark | Lancelet | 450 / 550 Mya |
-| 86 | *Callorhinchus milii* | Elephant shark | calMil1 | Zebrafish | Lamprey | 400 / 450 Mya |
+| 83 | *Latimeria chalumnae* | Coelacanth | latCha1 | *Xenopus* | Spotted gar | 410 / 440 Mya |
+| 84 | *Lepisosteus oculatus* | Spotted gar | lepOcu1 | Zebrafish | Coelacanth | 340 / 440 Mya |
+| 85 | *Petromyzon marinus* | Sea lamprey | petMar3 | Elephant shark | Lancelet | 500 / 550 Mya |
+| 86 | *Callorhinchus milii* | Elephant shark | calMil1 | Zebrafish | Lamprey | 450 / 500 Mya |
 
 ### Insects — *Drosophila* & relatives
 
@@ -457,8 +457,8 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 
 | # | Focal species | Common name | Assembly | Suggested inner outgroups | Suggested outer outgroup | Div. (inner / outer) |
 |---|---------------|-------------|----------|---------------------------|--------------------------|----------------------|
-| 99 | *C. elegans* | Nematode | ce11 | *C. briggsae*, *C. remanei* | *C. japonica* | 30 / 60 Mya |
-| 100 | *C. briggsae* | — | cb4 | *C. remanei*, *C. elegans* | *C. japonica* | 20–30 / 60 Mya |
+| 99 | *C. elegans* | Nematode | ce11 | *C. briggsae*, *C. remanei* | *C. japonica* | 80–100 / 100–200 Mya |
+| 100 | *C. briggsae* | — | cb4 | *C. remanei*, *C. elegans* | *C. japonica* | 80–100 / 100–200 Mya |
 | 101 | *Strongylocentrotus purpuratus* | Purple sea urchin | strPur2 | Lancelet | *C. elegans* | 520 / 650 Mya |
 | 102 | *Branchiostoma floridae* | Lancelet | braFlo1 | Sea urchin | Lamprey | 520 / 550 Mya |
 | 103 | *Ciona intestinalis* | Sea squirt | ci3 | Lancelet | Lamprey | 520 / 550 Mya |
@@ -487,6 +487,16 @@ These are starting-point suggestions. Always verify that pairwise net AXT alignm
 
 :::{note}
 Assemblies marked with **†** are not part of the core UCSC Genome Browser but may be available through UCSC's GenArk or via Ensembl/Phytozome. Entries with **—** in the assembly column have public genome assemblies but typically no UCSC pairwise alignments; you will need to generate AXT alignments yourself (see below).
+:::
+
+:::{warning}
+**Entries with poor inner/outer divergence ratios.** The guidelines above recommend the outer outgroup diverge ≥2–3× further than the inner outgroup. Several entries in the catalogue have much lower ratios due to the phylogenetic structure of the group. Use these configurations with caution — the outer tier provides limited additional confirmation:
+
+- **#14 Tarsier** (58 / 64 Mya, ratio 1.1×). Tarsiers are haplorhines, sister to anthropoids. The haplorhine–strepsirrhine split (64 Mya) barely exceeds the tarsier–anthropoid split (58 Mya). Consider using a non-primate outgroup (e.g. mouse, ~85 Mya) for a better outer tier.
+- **#52–53 Tasmanian devil & Wallaby** (62 / 69 Mya, ratio 1.1×). Australidelphian inter-ordinal divergences are close in time to the Didelphimorphia–Australidelphia split. Consider platypus (~190 Mya) as the outer outgroup for a ratio of ~3×.
+- **#69 Alligator** (255 / 275 Mya, ratio 1.08×). Turtles and lepidosaurs are nearly equidistant from crocodilians in deep time. Consider using a bird (e.g. chicken, ~240 Mya) as an inner outgroup to improve tiering.
+- **#83 Coelacanth** (410 / 440 Mya, ratio 1.07×). The Sarcopterygii–Actinopterygii split is only slightly deeper than the coelacanth–tetrapod split. Consider lamprey (~500 Mya) as an alternative outer outgroup.
+- **#99–100 *Caenorhabditis*** — divergence times in nematodes are poorly constrained due to the absence of a reliable fossil record. Published molecular clock estimates range widely (some studies give 18–30 Mya, others 80–110 Mya for the *C. elegans*–*C. briggsae* split). The values shown (80–100 Mya) reflect the most commonly cited molecular estimates.
 :::
 
 ### Generating your own alignments
